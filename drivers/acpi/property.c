@@ -1292,7 +1292,7 @@ struct fwnode_handle *acpi_get_next_subnode(const struct fwnode_handle *fwnode,
 		 * be looking for data_nodes below the last device found instead
 		 * of the common fwnode shared by device_nodes and data_nodes.
 		 */
-		adev = to_acpi_device_node(fwnode);
+		adev = to_acpi_device_node(fwnode); //NKW
 		if (adev)
 			head = &adev->data.subnodes;
 		else if (data)

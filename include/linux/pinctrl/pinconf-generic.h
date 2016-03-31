@@ -203,21 +203,34 @@ int pinconf_generic_dt_node_to_map(struct pinctrl_dev *pctldev,
 		unsigned int *num_maps, enum pinctrl_map_type type);
 void pinconf_generic_dt_free_map(struct pinctrl_dev *pctldev,
 		struct pinctrl_map *map, unsigned int num_maps);
+int pinconf_generic_fwnode_to_map(struct pinctrl_dev *pctldev,
+		struct fwnode_handle *fwnode, struct pinctrl_map **map,
+		unsigned int *num_maps, enum pinctrl_map_type type);
 
 static inline int pinconf_generic_dt_node_to_map_group(struct pinctrl_dev *pctldev,
 		struct device_node *np_config, struct pinctrl_map **map,
 		unsigned int *num_maps)
 {
+#ifdef CONFIG_ACPI
+	return pinconf_generic_fwnode_to_map(pctldev, &np_config->fwnode,
+			map, num_maps, PIN_MAP_TYPE_CONFIGS_GROUP);
+#else
 	return pinconf_generic_dt_node_to_map(pctldev, np_config, map, num_maps,
 			PIN_MAP_TYPE_CONFIGS_GROUP);
+#endif
 }
 
 static inline int pinconf_generic_dt_node_to_map_pin(struct pinctrl_dev *pctldev,
 		struct device_node *np_config, struct pinctrl_map **map,
 		unsigned int *num_maps)
 {
+#ifdef CONFIG_ACPI
+	return pinconf_generic_fwnode_to_map(pctldev, &np_config->fwnode,
+			map, num_maps, PIN_MAP_TYPE_CONFIGS_PIN);
+#else
 	return pinconf_generic_dt_node_to_map(pctldev, np_config, map, num_maps,
 			PIN_MAP_TYPE_CONFIGS_PIN);
+#endif
 }
 
 static inline int pinconf_generic_dt_node_to_map_all(struct pinctrl_dev *pctldev,
@@ -228,8 +241,13 @@ static inline int pinconf_generic_dt_node_to_map_all(struct pinctrl_dev *pctldev
 	 * passing the type as PIN_MAP_TYPE_INVALID causes the underlying parser
 	 * to infer the map type from the DT properties used.
 	 */
+#ifdef CONFIG_ACPI
+	return pinconf_generic_fwnode_to_map(pctldev, &np_config->fwnode,
+			map, num_maps, PIN_MAP_TYPE_INVALID);
+#else
 	return pinconf_generic_dt_node_to_map(pctldev, np_config, map, num_maps,
 			PIN_MAP_TYPE_INVALID);
+#endif
 }
 
 #endif /* __LINUX_PINCTRL_PINCONF_GENERIC_H */
