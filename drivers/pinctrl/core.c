@@ -36,6 +36,7 @@
 #include "devicetree.h"
 #include "pinconf.h"
 #include "pinmux.h"
+#include "acpi.h"
 
 static bool pinctrl_dummy_state;
 
@@ -127,6 +128,23 @@ struct pinctrl_dev *get_pinctrl_dev_from_of_node(struct device_node *np)
 
 	list_for_each_entry(pctldev, &pinctrldev_list, node)
 		if (device_match_of_node(pctldev->dev, np)) {
+			mutex_unlock(&pinctrldev_list_mutex);
+			return pctldev;
+		}
+
+	mutex_unlock(&pinctrldev_list_mutex);
+
+	return NULL;
+}
+
+struct pinctrl_dev *get_pinctrl_dev_from_acpi(acpi_handle handle)
+{
+	struct pinctrl_dev *pctldev;
+
+	mutex_lock(&pinctrldev_list_mutex);
+
+	list_for_each_entry(pctldev, &pinctrldev_list, node)
+		if (ACPI_HANDLE(pctldev->dev) == handle) {
 			mutex_unlock(&pinctrldev_list_mutex);
 			return pctldev;
 		}
@@ -1075,6 +1093,12 @@ static struct pinctrl *create_pinctrl(struct device *dev,
 		return ERR_PTR(ret);
 	}
 
+	ret = pinctrl_acpi_to_map(p);
+	if (ret < 0) {
+		kfree(p);
+		return ERR_PTR(ret);
+	}
+
 	devname = dev_name(dev);
 
 	mutex_lock(&pinctrl_maps_mutex);
@@ -1194,6 +1218,8 @@ static void pinctrl_free(struct pinctrl *p, bool inlist)
 	}
 
 	pinctrl_dt_free_maps(p);
+
+	pinctrl_acpi_free_maps(p);
 
 	if (inlist)
 		list_del(&p->node);
