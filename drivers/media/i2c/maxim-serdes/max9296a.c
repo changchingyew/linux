@@ -979,7 +979,7 @@ static int max9296a_probe(struct i2c_client *client)
 	priv->regmap = devm_regmap_init_i2c(client, &i2c_regmap);
 	if (IS_ERR(priv->regmap))
 		return PTR_ERR(priv->regmap);
-
+#if 0
 	priv->gpiod_pwdn = devm_gpiod_get_optional(&client->dev, "powerdown",
 						   GPIOD_OUT_HIGH);
 	if (IS_ERR(priv->gpiod_pwdn))
@@ -993,7 +993,7 @@ static int max9296a_probe(struct i2c_client *client)
 		/* Maximum power-up time (tLOCK) 4ms */
 		usleep_range(4000, 5000);
 	}
-
+#endif
 	*ops = max9296a_ops;
 
 	ops->versions = priv->info->versions;
@@ -1120,6 +1120,14 @@ static const struct max9296a_chip_info max96792a_info = {
 	.num_links = 2,
 };
 
+#ifdef CONFIG_ACPI
+static const struct acpi_device_id max9296a_acpi_ids[] = {
+	{ "INTC10CD", .driver_data = (kernel_ulong_t)&max9296a_info},
+	{}
+};
+MODULE_DEVICE_TABLE(acpi, max9296a_acpi_ids);
+#endif
+
 static const struct of_device_id max9296a_of_table[] = {
 	{ .compatible = "maxim,max9296a", .data = &max9296a_info },
 	{ .compatible = "maxim,max96714", .data = &max96714_info },
@@ -1134,6 +1142,7 @@ static struct i2c_driver max9296a_i2c_driver = {
 	.driver	= {
 		.name = "max9296a",
 		.of_match_table	= of_match_ptr(max9296a_of_table),
+		.acpi_match_table = ACPI_PTR(max9296a_acpi_ids),
 	},
 	.probe = max9296a_probe,
 	.remove = max9296a_remove,
@@ -1144,3 +1153,4 @@ module_i2c_driver(max9296a_i2c_driver);
 MODULE_DESCRIPTION("Maxim MAX9296A Quad GMSL2 Deserializer Driver");
 MODULE_AUTHOR("Cosmin Tanislav <cosmin.tanislav@analog.com>");
 MODULE_LICENSE("GPL");
+
