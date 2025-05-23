@@ -14,6 +14,7 @@
 #include <linux/types.h>
 
 #include <linux/pinctrl/machine.h>
+#include <linux/of.h>
 
 struct device_node;
 
@@ -198,15 +199,17 @@ int pinconf_generic_dt_subnode_to_map(struct pinctrl_dev *pctldev,
 		struct device_node *np, struct pinctrl_map **map,
 		unsigned int *reserved_maps, unsigned int *num_maps,
 		enum pinctrl_map_type type);
-int pinconf_generic_dt_node_to_map(struct pinctrl_dev *pctldev,
-		struct device_node *np_config, struct pinctrl_map **map,
-		unsigned int *num_maps, enum pinctrl_map_type type);
 void pinconf_generic_dt_free_map(struct pinctrl_dev *pctldev,
 		struct pinctrl_map *map, unsigned int num_maps);
+#ifdef CONFIG_ACPI
 int pinconf_generic_fwnode_to_map(struct pinctrl_dev *pctldev,
 		struct fwnode_handle *fwnode, struct pinctrl_map **map,
 		unsigned int *num_maps, enum pinctrl_map_type type);
-
+#else
+int pinconf_generic_dt_node_to_map(struct pinctrl_dev *pctldev,
+		struct device_node *np_config, struct pinctrl_map **map,
+		unsigned int *num_maps, enum pinctrl_map_type type);
+#endif
 static inline int pinconf_generic_dt_node_to_map_group(struct pinctrl_dev *pctldev,
 		struct device_node *np_config, struct pinctrl_map **map,
 		unsigned int *num_maps)

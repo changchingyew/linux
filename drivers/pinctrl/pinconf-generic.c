@@ -206,7 +206,7 @@ static const struct pinconf_generic_params fw_params[] = {
  * @ncfg. @ncfg is updated to reflect the number of entries after parsing. @cfg
  * needs to have enough memory allocated to hold all possible entries.
  */
-#ifdef (CONFIG_ACPI)
+#ifdef CONFIG_ACPI
 static void parse_fwnode_cfg(struct fwnode_handle *fwnode,
 			 const struct pinconf_generic_params *params,
 			 unsigned int count, unsigned long *cfg,
@@ -250,7 +250,7 @@ static void parse_dt_cfg(struct device_node *np,
  *           must be freed when no longer necessary.
  * @nconfigs: number of configurations
  */
-#ifdef (CONFIG_ACPI)
+#ifdef CONFIG_ACPI
 int pinconf_generic_parse_fwnode_config(struct fwnode_handle *fwnode,
 				    struct pinctrl_dev *pctldev,
 				    unsigned long **configs,
@@ -266,7 +266,7 @@ int pinconf_generic_parse_dt_config(struct device_node *np,
 	unsigned int max_cfg, ncfg = 0;
 	int ret;
 
-#ifdef (CONFIG_ACPI)
+#ifdef CONFIG_ACPI
 	if (!fwnode)
 #else
 	if (!np)
@@ -274,7 +274,7 @@ int pinconf_generic_parse_dt_config(struct device_node *np,
 		return -EINVAL;
 
 	/* allocate a temporary array big enough to hold one of each option */
-#ifdef (CONFIG_ACPI)
+#ifdef CONFIG_ACPI
 	max_cfg = ARRAY_SIZE(fw_params);
 #else
 	max_cfg = ARRAY_SIZE(dt_params);
@@ -285,14 +285,14 @@ int pinconf_generic_parse_dt_config(struct device_node *np,
 	if (!cfg)
 		return -ENOMEM;
 
-#ifdef (CONFIG_ACPI)
+#ifdef CONFIG_ACPI
 	parse_fwnode_cfg(fwnode, fw_params, ARRAY_SIZE(fw_params), cfg, &ncfg);
 #else
 	parse_dt_cfg(np, dt_params, ARRAY_SIZE(dt_params), cfg, &ncfg);
 #endif
 	if (pctldev && pctldev->desc->num_custom_params &&
 		pctldev->desc->custom_params)
-#ifdef (CONFIG_ACPI)
+#ifdef CONFIG_ACPI
 		parse_fwnode_cfg(fwnode, pctldev->desc->custom_params,
 					pctldev->desc->num_custom_params, cfg, &ncfg);
 #else
@@ -324,7 +324,7 @@ out:
 	kfree(cfg);
 	return ret;
 }
-#ifdef (CONFIG_ACPI)
+#ifdef CONFIG_ACPI
 EXPORT_SYMBOL_GPL(pinconf_generic_parse_fwnode_config);
 #else
 EXPORT_SYMBOL_GPL(pinconf_generic_parse_dt_config);
@@ -352,13 +352,14 @@ int pinconf_generic_dt_subnode_to_map(struct pinctrl_dev *pctldev,
 	const char *group;
 	const char *subnode_target_type = "pins";
 
-#ifdef (CONFIG_ACPI)
+#ifdef CONFIG_ACPI
+	const char **groups;
 	ret = fwnode_property_read_string_array(fwnode, "pins", NULL, 0);
 #else
 	ret = of_property_count_strings(np, "pins");
 #endif
 	if (ret < 0) {
-#ifdef (CONFIG_ACPI)
+#ifdef CONFIG_ACPI
 		ret = fwnode_property_read_string_array(fwnode, "groups", NULL, 0);
 #else
 		ret = of_property_count_strings(np, "groups");
@@ -375,7 +376,7 @@ int pinconf_generic_dt_subnode_to_map(struct pinctrl_dev *pctldev,
 	}
 	strings_count = ret;
 
-#ifdef (CONFIG_ACPI)
+#ifdef CONFIG_ACPI
 	ret = fwnode_property_read_string(fwnode, "function", &function);
 #else
 	ret = of_property_read_string(np, "function", &function);
@@ -383,7 +384,7 @@ int pinconf_generic_dt_subnode_to_map(struct pinctrl_dev *pctldev,
 	if (ret < 0) {
 		/* EINVAL=missing, which is fine since it's optional */
 		if (ret != -EINVAL)
-#ifdef (CONFIG_ACPI)
+#ifdef CONFIG_ACPI
 			dev_err(dev, "%pOF: %s: could not parse property function\n",
 				fwnode, fwnode_get_name(fwnode));
 #else
@@ -393,7 +394,7 @@ int pinconf_generic_dt_subnode_to_map(struct pinctrl_dev *pctldev,
 		function = NULL;
 	}
 
-#ifdef (CONFIG_ACPI)
+#ifdef CONFIG_ACPI
 	ret = pinconf_generic_parse_fwnode_config(fwnode, pctldev,
 						  &configs, &num_configs);
 #else
@@ -401,7 +402,7 @@ int pinconf_generic_dt_subnode_to_map(struct pinctrl_dev *pctldev,
 					      &num_configs);
 #endif
 	if (ret < 0) {
-#ifdef (CONFIG_ACPI)
+#ifdef CONFIG_ACPI
 		dev_err(dev, "%pOF: %s: could not parse node property\n",
 			fwnode, fwnode_get_name(fwnode));
 #else
@@ -423,19 +424,19 @@ int pinconf_generic_dt_subnode_to_map(struct pinctrl_dev *pctldev,
 	if (ret < 0)
 		goto exit_free_configs;
 
-	groups = kcalloc(strings_count * sizeof(*groups), GFP_KERNEL);
+#ifdef CONFIG_ACPI
+	groups = kcalloc(strings_count, sizeof(*groups), GFP_KERNEL);
 	if (!groups) {
 		ret = -ENOMEM;
 		goto exit_free_configs;
 	}
 
-#ifdef (CONFIG_ACPI)
 	ret = fwnode_property_read_string_array(fwnode, subnode_target_type,
 					 groups, strings_count);
 	if (ret < 0)
 		goto exit_free_groups;
 
-	for (i = 0; i < strings_count; i++) {
+	for (int i = 0; i < strings_count; i++) {
 		if (function) {
 			ret = pinctrl_utils_add_map_mux(pctldev, map,
 					reserved_maps, num_maps, groups[i],
@@ -479,14 +480,14 @@ exit_free_configs:
 	kfree(configs);
 	return ret;
 }
-#ifdef (CONFIG_ACPI)
+#ifdef CONFIG_ACPI
 EXPORT_SYMBOL_GPL(pinconf_generic_fwnode_subnode_to_map);
 #else
 EXPORT_SYMBOL_GPL(pinconf_generic_dt_subnode_to_map);
 #endif
 
-#ifdef (CONFIG_ACPI)
-int pinconf_generic_fwnode_node_to_map(struct pinctrl_dev *pctldev,
+#ifdef CONFIG_ACPI
+int pinconf_generic_fwnode_to_map(struct pinctrl_dev *pctldev,
 		struct fwnode_handle *fwnode, struct pinctrl_map **map,
 		unsigned int *num_maps, enum pinctrl_map_type type)
 #else
@@ -496,7 +497,7 @@ int pinconf_generic_dt_node_to_map(struct pinctrl_dev *pctldev,
 #endif
 {
 
-#ifdef (CONFIG_ACPI)
+#ifdef CONFIG_ACPI
 	struct fwnode_handle *fw;
 #endif
 	unsigned int reserved_maps;
@@ -506,7 +507,7 @@ int pinconf_generic_dt_node_to_map(struct pinctrl_dev *pctldev,
 	*map = NULL;
 	*num_maps = 0;
 
-#ifdef (CONFIG_ACPI)
+#ifdef CONFIG_ACPI
 	ret = pinconf_generic_fwnode_subnode_to_map(pctldev, fwnode,
 					 map, &reserved_maps, num_maps,
 					 type);
@@ -517,7 +518,7 @@ int pinconf_generic_dt_node_to_map(struct pinctrl_dev *pctldev,
 	if (ret < 0)
 		goto exit;
 
-#ifdef (CONFIG_ACPI)
+#ifdef CONFIG_ACPI
 	fwnode_for_each_child_node(fwnode, fw) {
 		ret = pinconf_generic_fwnode_subnode_to_map(pctldev, fw, map,
 					&reserved_maps, num_maps, type);
@@ -538,8 +539,8 @@ exit:
 	pinctrl_utils_free_map(pctldev, *map, *num_maps);
 	return ret;
 }
-#ifdef (CONFIG_ACPI)
-EXPORT_SYMBOL_GPL(pinconf_generic_fwnode_node_to_map);
+#ifdef CONFIG_ACPI
+EXPORT_SYMBOL_GPL(pinconf_generic_fwnode_to_map);
 #else
 EXPORT_SYMBOL_GPL(pinconf_generic_dt_node_to_map);
 #endif

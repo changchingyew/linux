@@ -36,7 +36,17 @@
 #include "devicetree.h"
 #include "pinconf.h"
 #include "pinmux.h"
-#include "acpi.h"
+#include "pinctrl-acpi.h"
+
+
+#ifdef CONFIG_DEBUG_FS
+static const struct file_operations pinctrl_pins_fops;
+static const struct file_operations pinctrl_groups_fops;
+static const struct file_operations pinctrl_gpioranges_fops;
+static const struct file_operations pinctrl_devices_fops;
+static const struct file_operations pinctrl_maps_fops;
+static const struct file_operations pinctrl_fops;
+#endif
 
 static bool pinctrl_dummy_state;
 
@@ -57,7 +67,6 @@ static LIST_HEAD(pinctrl_list);
 
 /* List of pinctrl maps (struct pinctrl_maps) */
 LIST_HEAD(pinctrl_maps);
-
 
 /**
  * pinctrl_provide_dummies() - indicate if pinctrl provides dummy state support

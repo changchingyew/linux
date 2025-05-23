@@ -13,8 +13,11 @@
  * more details.
  */
 
-#ifdef CONFIG_ACPI
+struct pinctrl;
 
+#ifdef CONFIG_ACPI
+#include <linux/pinctrl/pinctrl.h>
+#include <linux/pinctrl/pinconf-generic.h>
 void pinctrl_acpi_free_maps(struct pinctrl *p);
 int pinctrl_acpi_to_map(struct pinctrl *p);
 

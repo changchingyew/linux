@@ -21,7 +21,7 @@
 #include <linux/pinctrl/pinctrl.h>
 #include <linux/pinctrl/pinconf-generic.h>
 
-#include "acpi.h"
+#include "pinctrl-acpi.h"
 #include "core.h"
 #include "pinconf.h"
 #include "pinctrl-utils.h"
@@ -41,6 +41,7 @@ struct pinctrl_acpi_map {
 
 static void acpi_maps_list_dh(acpi_handle handle, void *data)
 {
+	return;
 	/* The address of this function is used as a key. */
 }
 
@@ -84,6 +85,7 @@ static int acpi_init_maps(struct device *dev)
 	return 0;
 }
 
+#ifdef CONFIG_ACPI
 void pinctrl_acpi_free_maps(struct pinctrl *p)
 {
 	struct pinctrl_acpi_map *map, *_map;
@@ -94,7 +96,7 @@ void pinctrl_acpi_free_maps(struct pinctrl *p)
 		goto out;
 
 	list_for_each_entry_safe(map, _map, maps, node) {
-		pinctrl_unregister_map(map->map);
+		pinctrl_unregister_mappings(map->map);
 		list_del(&map->node);
 		pinctrl_utils_free_map(map->pctldev, map->map, map->num_maps);
 		kfree(map);
@@ -102,8 +104,9 @@ void pinctrl_acpi_free_maps(struct pinctrl *p)
 
 	acpi_free_maps(p->dev, maps);
 out:
-	acpi_bus_put_acpi_device(ACPI_COMPANION(p->dev));
+	//acpi_bus_put_acpi_device(ACPI_COMPANION(p->dev));
 }
+#endif
 
 static int acpi_remember_or_free_map(struct pinctrl *p, const char *statename,
 				     struct pinctrl_dev *pctldev,
@@ -137,7 +140,8 @@ static int acpi_remember_or_free_map(struct pinctrl *p, const char *statename,
 	acpi_map->num_maps = num_maps;
 	list_add_tail(&acpi_map->node, acpi_maps);
 
-	return pinctrl_register_map(map, num_maps, false);
+	return pinctrl_register_mappings(map, num_maps);
+	//return pinctrl_register_map(map, num_maps, false);
 }
 
 #ifdef CONFIG_GENERIC_PINCONF
@@ -463,7 +467,8 @@ int pinctrl_acpi_to_map(struct pinctrl *p)
 	int ret;
 
 	/* We may store pointers to property names within the node */
-	adev = acpi_bus_get_acpi_device(ACPI_HANDLE(p->dev));
+	adev = acpi_get_acpi_dev(ACPI_HANDLE(p->dev));
+	//adev = acpi_bus_get_acpi_device(ACPI_HANDLE(p->dev));
 	if (!adev)
 		return -ENODEV;
 
@@ -471,7 +476,8 @@ int pinctrl_acpi_to_map(struct pinctrl *p)
 	ret = acpi_dev_get_property(adev, "pinctrl-names", ACPI_TYPE_PACKAGE,
 				    &prop);
 	if (ret) {
-		acpi_bus_put_acpi_device(adev);
+		acpi_put_acpi_dev(adev);
+		//acpi_bus_put_acpi_device(adev);
 		/* No pinctrl properties */
 		return 0;
 	}
