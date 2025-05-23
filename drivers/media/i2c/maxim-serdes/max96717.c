@@ -1153,8 +1153,10 @@ static const struct pinctrl_ops max96717_ctrl_ops = {
 	.get_groups_count = max96717_ctrl_get_groups_count,
 	.get_group_name = max96717_ctrl_get_group_name,
 	.get_group_pins = max96717_ctrl_get_group_pins,
+#ifdef CONFIG_OF
 	.dt_node_to_map = pinconf_generic_dt_node_to_map_pin,
 	.dt_free_map = pinconf_generic_dt_free_map,
+#endif
 };
 
 static const struct pinconf_ops max96717_conf_ops = {
@@ -1476,6 +1478,14 @@ static const struct max96717_chip_info max96717_info = {
 	.phy_hw_ids = { 1 },
 };
 
+#ifdef CONFIG_ACPI
+static const struct acpi_device_id max9295a_acpi_ids[] = {
+	{ "INTC1095", .driver_data = (kernel_ulong_t)&max9295a_info},
+	{}
+};
+MODULE_DEVICE_TABLE(acpi, max9295a_acpi_ids);
+#endif
+
 static const struct of_device_id max96717_of_ids[] = {
 	{ .compatible = "maxim,max9295a", .data = &max9295a_info },
 	{ .compatible = "maxim,max96717", .data = &max96717_info },
@@ -1489,6 +1499,7 @@ static struct i2c_driver max96717_i2c_driver = {
 	.driver	= {
 		.name = MAX96717_NAME,
 		.of_match_table = max96717_of_ids,
+		.acpi_match_table = ACPI_PTR(max9295a_acpi_ids),
 	},
 	.probe = max96717_probe,
 	.remove = max96717_remove,

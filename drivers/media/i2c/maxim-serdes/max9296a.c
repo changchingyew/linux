@@ -330,12 +330,12 @@ static int max9296a_init(struct max_des *des)
 	struct max9296a_priv *priv = des_to_priv(des);
 	int ret;
 
+	pr_err("max9296a_init 1\n");
 	/* Disable link auto-select. */
 	ret = regmap_clear_bits(priv->regmap, MAX9296A_CTRL0,
 				MAX9296A_CTRL0_AUTO_LINK);
 	if (ret)
 		return ret;
-
 	return 0;
 }
 
@@ -957,6 +957,7 @@ static int max9296a_probe(struct i2c_client *client)
 	struct max_des_ops *ops;
 	int ret;
 
+	pr_err("max9296a_probe 0\n");
 	priv = devm_kzalloc(dev, sizeof(*priv), GFP_KERNEL);
 	if (!priv)
 		return -ENOMEM;
@@ -970,6 +971,8 @@ static int max9296a_probe(struct i2c_client *client)
 		dev_err(dev, "Failed to get match data\n");
 		return -ENODEV;
 	}
+	pr_err("max9296a_chip_info max_register: %x\n",
+	       priv->info->max_register);
 
 	priv->dev = dev;
 	priv->client = client;
@@ -994,6 +997,7 @@ static int max9296a_probe(struct i2c_client *client)
 		usleep_range(4000, 5000);
 	}
 #endif
+	dev_err(dev, "upstream max9296a probe\n");
 	*ops = max9296a_ops;
 
 	ops->versions = priv->info->versions;
@@ -1011,10 +1015,11 @@ static int max9296a_probe(struct i2c_client *client)
 	ops->select_resets_link = priv->info->select_resets_link;
 	priv->des.ops = ops;
 
+#if 1
 	ret = max9296a_reset(priv);
 	if (ret)
 		return ret;
-
+#endif
 	return max_des_probe(client, &priv->des);
 }
 
@@ -1023,8 +1028,9 @@ static void max9296a_remove(struct i2c_client *client)
 	struct max9296a_priv *priv = i2c_get_clientdata(client);
 
 	max_des_remove(&priv->des);
-
+#if 0
 	gpiod_set_value_cansleep(priv->gpiod_pwdn, 1);
+#endif
 }
 
 static const struct max_phys_config max9296a_phys_configs[] = {
@@ -1122,7 +1128,7 @@ static const struct max9296a_chip_info max96792a_info = {
 
 #ifdef CONFIG_ACPI
 static const struct acpi_device_id max9296a_acpi_ids[] = {
-	{ "INTC10CD", .driver_data = (kernel_ulong_t)&max9296a_info},
+	{ "INTC1031", .driver_data = (kernel_ulong_t)&max9296a_info},
 	{}
 };
 MODULE_DEVICE_TABLE(acpi, max9296a_acpi_ids);

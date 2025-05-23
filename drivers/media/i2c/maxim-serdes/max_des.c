@@ -816,7 +816,6 @@ static int max_des_init_link_ser_xlate(struct max_des_priv *priv,
 	u8 addrs[] = { power_up_addr, new_addr };
 	u8 current_addr;
 	int ret;
-
 	ret = des->ops->select_links(des, BIT(link->index));
 	if (ret)
 		return ret;
@@ -875,14 +874,19 @@ static int max_des_init(struct max_des_priv *priv)
 	unsigned int i;
 	int ret;
 
+	dev_err(priv->dev, "des_init 1\n");
+#if 0
 	ret = des->ops->init(des);
 	if (ret)
 		return ret;
+#endif
 
+	dev_err(priv->dev, "des_init 2\n");
 	ret = des->ops->set_enable(des, false);
 	if (ret)
 		return ret;
 
+	dev_err(priv->dev, "des_init 3\n");
 	for (i = 0; i < des->ops->num_phys; i++) {
 		struct max_des_phy *phy = &des->phys[i];
 
@@ -897,6 +901,7 @@ static int max_des_init(struct max_des_priv *priv)
 			return ret;
 	}
 
+	dev_err(priv->dev, "des_init 4\n");
 	for (i = 0; i < des->ops->num_pipes; i++) {
 		struct max_des_pipe *pipe = &des->pipes[i];
 
@@ -923,6 +928,7 @@ static int max_des_init(struct max_des_priv *priv)
 	if (!des->ops->init_link)
 		return 0;
 
+	dev_err(priv->dev, "des_init 5\n");
 	for (i = 0; i < des->ops->num_links; i++) {
 		struct max_des_link *link = &des->links[i];
 
@@ -1937,6 +1943,8 @@ static int max_des_parse_sink_dt_endpoint(struct max_des_priv *priv,
 	char poc_name[10];
 	int ret;
 
+	pr_err("max_des_parse_sink_dt_endpoint 1\n");
+	pr_err("fwnode_graph_get_endpoint_by_id pad %d\n", pad);
 	ep = fwnode_graph_get_endpoint_by_id(fwnode, pad, 0, 0);
 	if (!ep)
 		return 0;
@@ -1987,10 +1995,13 @@ static int max_des_parse_src_dt_endpoint(struct max_des_priv *priv,
 	unsigned int i;
 	int ret;
 
+	pr_err("max_des_parse_src_dt_endpoint 1\n");
+	pr_err("fwnode_graph_get_endpoint_by_id pad %d\n", pad);
 	ep = fwnode_graph_get_endpoint_by_id(fwnode, pad, 0, 0);
 	if (!ep)
 		return 0;
 
+	pr_err("max_des_parse_src_dt_endpoint 2\n");
 	ret = v4l2_fwnode_endpoint_alloc_parse(ep, &v4l2_ep);
 	fwnode_handle_put(ep);
 	if (ret) {
@@ -2030,6 +2041,7 @@ static int max_des_parse_src_dt_endpoint(struct max_des_priv *priv,
 		return -EINVAL;
 	}
 
+	pr_err("max_des_parse_src_dt_endpoint 3\n");
 	for (i = 0; i < mipi->num_data_lanes; i++) {
 		if (mipi->data_lanes[i] > mipi->num_data_lanes) {
 			dev_err(priv->dev, "Invalid data lane %u on port %u\n",
@@ -2108,6 +2120,8 @@ static int max_des_parse_dt(struct max_des_priv *priv)
 	unsigned int i;
 	int ret;
 
+	pr_err("max_des_parse_dt 1\n");
+
 	for (i = 0; i < des->ops->num_phys; i++) {
 		phy = &des->phys[i];
 		phy->index = i;
@@ -2117,10 +2131,12 @@ static int max_des_parse_dt(struct max_des_priv *priv)
 			return ret;
 	}
 
+	pr_err("max_des_parse_dt 2\n");
 	ret = max_des_find_phys_config(priv);
 	if (ret)
 		return ret;
 
+	pr_err("max_des_parse_dt 3\n");
 	/* Find an unsed PHY to send unampped data to. */
 	for (i = 0; i < des->ops->num_phys; i++) {
 		phy = &des->phys[i];
@@ -2131,6 +2147,7 @@ static int max_des_parse_dt(struct max_des_priv *priv)
 		}
 	}
 
+	pr_err("max_des_parse_dt 4\n");
 	for (i = 0; i < des->ops->num_pipes; i++) {
 		pipe = &des->pipes[i];
 		pipe->index = i;
@@ -2154,11 +2171,13 @@ static int max_des_parse_dt(struct max_des_priv *priv)
 		pipe->link_id = i;
 	}
 
+	pr_err("max_des_parse_dt 5\n");
 	for (i = 0; i < des->ops->num_links; i++) {
 		link = &des->links[i];
 		link->index = i;
 	}
 
+	pr_err("max_des_parse_dt 6\n");
 	for (i = 0; i < des->ops->num_links; i++) {
 		struct max_des_link *link = &des->links[i];
 		struct max_source *source;
@@ -2227,6 +2246,8 @@ int max_des_probe(struct i2c_client *client, struct max_des *des)
 	struct max_des_priv *priv;
 	int ret;
 
+	dev_err(dev, "des_probe 1\n");
+
 	if (des->ops->num_phys > MAX_DES_PHYS_NUM)
 		return -E2BIG;
 
@@ -2271,10 +2292,13 @@ int max_des_probe(struct i2c_client *client, struct max_des *des)
 	if (ret)
 		return ret;
 
+	dev_err(dev, "des_probe 2\n");
+
 	ret = max_des_parse_dt(priv);
 	if (ret)
 		return ret;
 
+	dev_err(dev, "des_probe 3\n");
 	ret = max_des_init(priv);
 	if (ret)
 		return ret;
@@ -2283,10 +2307,12 @@ int max_des_probe(struct i2c_client *client, struct max_des *des)
 	if (ret)
 		return ret;
 
+	dev_err(dev, "des_probe 4\n");
 	ret = max_des_i2c_adapter_init(priv);
 	if (ret)
 		goto err_disable_pocs;
 
+	dev_err(dev, "des_probe 5\n");
 	ret = max_des_v4l2_register(priv);
 	if (ret)
 		goto err_i2c_adapter_deinit;
