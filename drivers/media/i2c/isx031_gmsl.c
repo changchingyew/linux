@@ -18,7 +18,7 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include <asm/unaligned.h>
+#include <linux/unaligned.h>
 #include <linux/delay.h>
 #include <linux/gpio.h>
 #include <linux/i2c.h>
@@ -31,17 +31,31 @@
 #include <linux/string.h>
 #include <linux/videodev2.h>
 #include <linux/version.h>
-#ifdef CONFIG_VIDEO_INTEL_IPU6
-#include <uapi/linux/ipu-isys.h>
-#endif
+#define CONFIG_VIDEO_INTEL_IPU6 1
 #include <media/media-entity.h>
 #include <media/v4l2-ctrls.h>
 #include <media/v4l2-device.h>
 #include <media/v4l2-subdev.h>
 #include <media/v4l2-mediabus.h>
 
+#include "isx031.h"
+#ifdef CONFIG_VIDEO_INTEL_IPU6
+#define GMSL_CSI_DT_YUV422_8 0x1E
+#define V4L2_CID_IPU_BASE	(V4L2_CID_USER_BASE + 0x1080)
+
+#define V4L2_CID_IPU_STORE_CSI2_HEADER	(V4L2_CID_IPU_BASE + 2)
+#define V4L2_CID_IPU_ISYS_COMPRESSION	(V4L2_CID_IPU_BASE + 3)
+
+#define V4L2_CID_IPU_QUERY_SUB_STREAM	(V4L2_CID_IPU_BASE + 4)
+#define V4L2_CID_IPU_SET_SUB_STREAM	(V4L2_CID_IPU_BASE + 5)
+
+#define V4L2_CID_IPU_ENUMERATE_LINK	(V4L2_CID_IPU_BASE + 6)
+
+#define VIDIOC_IPU_GET_DRIVER_VERSION \
+	_IOWR('v', BASE_VIDIOC_PRIVATE + 3, uint32_t)
+#endif
+
 #ifdef CONFIG_VIDEO_ISX031_SERDES
-#include <media/isx031.h>
 #include <media/ipu-acpi-pdata.h>
 #include <media/max9295.h>
 #include <media/max9296.h>
@@ -1069,6 +1083,53 @@ static const struct v4l2_subdev_internal_ops isx031_sensor_internal_ops = {
 	.close = isx031_mux_close,
 };
 
+#ifdef CONFIG_VIDEO_INTEL_IPU6
+static short sensor_vc[NR_OF_ISX031_STREAMS * 2] = {0,1,2,3,2,3,0,1};
+module_param_array(sensor_vc, ushort, NULL, 0444);
+MODULE_PARM_DESC(sensor_vc, "VC set for sensors\n"
+		"\t\tsensor_vc=0,1,2,3,2,3,0,1");
+
+//#define PLATFORM_AXIOMTEK 1
+#ifdef PLATFORM_AXIOMTEK
+static short serdes_bus[4] = {5, 5, 5, 5};
+#else
+static short serdes_bus[4] = {2, 2, 4, 4};
+#endif
+module_param_array(serdes_bus, ushort, NULL, 0444);
+MODULE_PARM_DESC(serdes_bus, "max9295/6 deserializer i2c bus\n"
+		"\t\tserdes_bus=2,2,4,4");
+
+// Deserializer addresses can be 0x40 0x48 0x4a
+#ifdef PLATFORM_AXIOMTEK
+static unsigned short des_addr[4] = {0x48, 0x4a, 0x68, 0x6c};
+#else
+static unsigned short des_addr[4] = {0x48, 0x4a, 0x48, 0x4a};
+#endif
+module_param_array(des_addr, ushort, NULL, 0444);
+MODULE_PARM_DESC(des_addr, "max9296 deserializer i2c address\n"
+		"\t\tdes_addr=0x48,0x4a,0x48,0x4a");
+
+static int isx031_i2c_addr_setting(struct i2c_client *c, struct isx031 *state)
+{
+	int i = 0;
+	int c_addr_save = c->addr;
+	int c_bus = c->adapter->nr;
+	for (i = 0; i < 4; i++) {
+		if (c_bus == serdes_bus[i]) {
+			c->addr = des_addr[i];
+			dev_info(&c->dev, "Set max9296@%d-0x%x Link reset\n",
+					c_bus, c->addr);
+			// Hold link in reset while setting things up
+			//max9296_reset_link(&isx031->dser_i2c->dev);
+		}
+	}
+	// restore original slave address
+	c->addr = c_addr_save;
+
+	return 0;
+}
+#endif
+
 #ifdef CONFIG_VIDEO_ISX031_SERDES
 
 /*
@@ -1298,52 +1359,7 @@ error:
 	return err;
 }
 
-#ifdef CONFIG_VIDEO_INTEL_IPU6
-static short sensor_vc[NR_OF_ISX031_STREAMS * 2] = {0,1,2,3,2,3,0,1};
-module_param_array(sensor_vc, ushort, NULL, 0444);
-MODULE_PARM_DESC(sensor_vc, "VC set for sensors\n"
-		"\t\tsensor_vc=0,1,2,3,2,3,0,1");
 
-//#define PLATFORM_AXIOMTEK 1
-#ifdef PLATFORM_AXIOMTEK
-static short serdes_bus[4] = {5, 5, 5, 5};
-#else
-static short serdes_bus[4] = {2, 2, 4, 4};
-#endif
-module_param_array(serdes_bus, ushort, NULL, 0444);
-MODULE_PARM_DESC(serdes_bus, "max9295/6 deserializer i2c bus\n"
-		"\t\tserdes_bus=2,2,4,4");
-
-// Deserializer addresses can be 0x40 0x48 0x4a
-#ifdef PLATFORM_AXIOMTEK
-static unsigned short des_addr[4] = {0x48, 0x4a, 0x68, 0x6c};
-#else
-static unsigned short des_addr[4] = {0x48, 0x4a, 0x48, 0x4a};
-#endif
-module_param_array(des_addr, ushort, NULL, 0444);
-MODULE_PARM_DESC(des_addr, "max9296 deserializer i2c address\n"
-		"\t\tdes_addr=0x48,0x4a,0x48,0x4a");
-
-static int isx031_i2c_addr_setting(struct i2c_client *c, struct isx031 *state)
-{
-	int i = 0;
-	int c_addr_save = c->addr;
-	int c_bus = c->adapter->nr;
-	for (i = 0; i < 4; i++) {
-		if (c_bus == serdes_bus[i]) {
-			c->addr = des_addr[i];
-			dev_info(&c->dev, "Set max9296@%d-0x%x Link reset\n",
-					c_bus, c->addr);
-			// Hold link in reset while setting things up
-			//max9296_reset_link(&isx031->dser_i2c->dev);
-		}
-	}
-	// restore original slave address
-	c->addr = c_addr_save;
-
-	return 0;
-}
-#endif
 static int isx031_serdes_setup(struct isx031 *isx031)
 {
 	int ret = 0;

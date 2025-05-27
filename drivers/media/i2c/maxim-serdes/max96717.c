@@ -1480,7 +1480,7 @@ static const struct max96717_chip_info max96717_info = {
 
 #ifdef CONFIG_ACPI
 static const struct acpi_device_id max9295a_acpi_ids[] = {
-	{ "INTC1095", .driver_data = (kernel_ulong_t)&max9295a_info},
+	{ "INTCXX95", .driver_data = (kernel_ulong_t)&max9295a_info},
 	{}
 };
 MODULE_DEVICE_TABLE(acpi, max9295a_acpi_ids);
