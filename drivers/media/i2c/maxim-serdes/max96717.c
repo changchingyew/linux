@@ -1153,10 +1153,8 @@ static const struct pinctrl_ops max96717_ctrl_ops = {
 	.get_groups_count = max96717_ctrl_get_groups_count,
 	.get_group_name = max96717_ctrl_get_group_name,
 	.get_group_pins = max96717_ctrl_get_group_pins,
-#ifdef CONFIG_OF
 	.dt_node_to_map = pinconf_generic_dt_node_to_map_pin,
 	.dt_free_map = pinconf_generic_dt_free_map,
-#endif
 };
 
 static const struct pinconf_ops max96717_conf_ops = {
@@ -1480,7 +1478,7 @@ static const struct max96717_chip_info max96717_info = {
 
 #ifdef CONFIG_ACPI
 static const struct acpi_device_id max9295a_acpi_ids[] = {
-	{ "INTCXX95", .driver_data = (kernel_ulong_t)&max9295a_info},
+	{ "INTC1138", .driver_data = (kernel_ulong_t)&max9295a_info},
 	{}
 };
 MODULE_DEVICE_TABLE(acpi, max9295a_acpi_ids);
