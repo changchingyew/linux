@@ -37,6 +37,7 @@
 #include <media/v4l2-device.h>
 #include <media/v4l2-subdev.h>
 #include <media/v4l2-mediabus.h>
+#include <media/v4l2-fwnode.h>
 
 #include "isx031.h"
 #ifdef CONFIG_VIDEO_INTEL_IPU6
@@ -190,6 +191,10 @@ struct serdes_state {
 };
 #endif
 
+struct isx031_hwcfg {
+	unsigned long link_freq_bitmap;
+};
+
 struct isx031 {
 	struct { struct isx031_sensor sensor; } yuv;
 	struct {
@@ -200,6 +205,7 @@ struct isx031 {
 	struct isx031_ctrls ctrls;
 	bool power;
 	struct i2c_client *client;
+	struct isx031_hwcfg *hwcfg;
 	/*struct isx031_vchan virtual_channels[CSI2_MAX_VIRTUAL_CHANNELS];*/
 	/* All below pointers are used for writing, cannot be const */
 	struct mutex lock;
@@ -2265,6 +2271,57 @@ static void isx031_mux_remove(struct isx031 *isx031)
 #endif
 }
 
+static struct isx031_hwcfg *isx031_get_hwcfg(struct isx031 *isx031, struct device *dev)
+{
+	struct isx031_hwcfg *cfg;
+	struct fwnode_handle *endpoint;
+	struct v4l2_fwnode_endpoint bus_cfg = {
+		.bus_type = V4L2_MBUS_CSI2_DPHY,
+	};
+	int ret;
+
+	endpoint =
+		fwnode_graph_get_endpoint_by_id(dev_fwnode(dev), 0, 0,
+						FWNODE_GRAPH_ENDPOINT_NEXT);
+	if (!endpoint) {
+		dev_err(dev, "endpoint node not found");
+		return -EPROBE_DEFER;
+	}
+
+	ret = v4l2_fwnode_endpoint_alloc_parse(endpoint, &bus_cfg);
+	if (ret) {
+		dev_err(dev, "parsing endpoint node failed");
+		goto out_err;
+	}
+
+	cfg = devm_kzalloc(dev, sizeof(*cfg), GFP_KERNEL);
+	if (!cfg)
+		goto out_err;
+
+	/* Check the number of MIPI CSI2 data lanes */
+	if (bus_cfg.bus.mipi_csi2.num_data_lanes != 2 ) {
+		dev_err(dev, "only 2 data lanes are currently supported");
+		goto out_err;
+	}
+
+	// ret = v4l2_link_freq_to_bitmap(dev, bus_cfg.link_frequencies,
+	// 			       bus_cfg.nr_of_link_frequencies,
+	// 			       link_freq_menu_items,
+	// 			       ARRAY_SIZE(link_freq_menu_items),
+	// 			       &isx031->link_freq_bitmap);
+	// if (ret)
+	// 	goto out_err;
+
+	v4l2_fwnode_endpoint_free(&bus_cfg);
+	fwnode_handle_put(endpoint);
+	return cfg;
+
+out_err:
+	v4l2_fwnode_endpoint_free(&bus_cfg);
+	fwnode_handle_put(endpoint);
+	return NULL;
+}
+
 static int isx031_v4l_init(struct i2c_client *c, struct isx031 *isx031)
 {
 	int ret;
@@ -2356,6 +2413,12 @@ static int isx031_probe(struct i2c_client *c)
 	isx031->variant = isx031_variants;
 #endif
 
+	isx031->hwcfg = isx031_get_hwcfg(isx031, &c->dev);
+	if (!isx031->hwcfg) {
+		ret = -ENODEV;
+		goto e_probe;
+	}
+
 #ifdef CONFIG_OF
 	isx031->vcc = devm_regulator_get(&c->dev, "vcc");
 	if (IS_ERR(isx031->vcc)) {
@@ -2439,6 +2502,7 @@ e_regulator:
 	}
 	mutex_unlock(&serdes_lock__);
 #endif
+e_probe:
 	return ret;
 }
 
@@ -2536,6 +2600,12 @@ static void isx031_remove(struct i2c_client *c)
 #endif
 }
 
+static const struct acpi_device_id isx031_acpi_ids[] = {
+	{ "INTC1031" },
+	{}
+};
+MODULE_DEVICE_TABLE(acpi, isx031_acpi_ids);
+
 static const struct i2c_device_id isx031_id[] = {
 	{ ISX031_NAME, ISX031_ISX031U },
 	{ },
@@ -2551,7 +2621,9 @@ MODULE_DEVICE_TABLE(of, isx031_of_match);
 static struct i2c_driver isx031_i2c_driver = {
 	.driver = {
 		.owner = THIS_MODULE,
-		.name = ISX031_NAME
+		.name = ISX031_NAME,
+		.acpi_match_table = ACPI_PTR(isx031_acpi_ids),
+		.of_match_table = isx031_of_match,
 	},
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 1, 0) && LINUX_VERSION_CODE < KERNEL_VERSION(6, 6, 0)
 	.probe_new	= isx031_probe,
