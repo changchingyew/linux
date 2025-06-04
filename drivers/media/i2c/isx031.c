@@ -68,6 +68,10 @@ struct isx031_mode {
 	const struct isx031_reg_list reg_list;
 };
 
+struct isx031_hwcfg {
+	unsigned long link_freq_bitmap;
+};
+
 struct isx031 {
 	struct v4l2_subdev sd;
 	struct media_pad pad;
@@ -84,6 +88,7 @@ struct isx031 {
 	struct i2c_client *client;
 
 	struct isx031_platform_data *platform_data;
+	struct isx031_hwcfg *hwcfg;
 
 	/* Streaming on/off */
 	bool streaming;
@@ -622,6 +627,57 @@ static const struct v4l2_subdev_internal_ops isx031_internal_ops = {
 	.open = isx031_open,
 };
 
+static struct isx031_hwcfg *isx031_get_hwcfg(struct isx031 *isx031, struct device *dev)
+{
+	struct isx031_hwcfg *cfg;
+	struct fwnode_handle *endpoint;
+	struct v4l2_fwnode_endpoint bus_cfg = {
+		.bus_type = V4L2_MBUS_CSI2_DPHY,
+	};
+	int ret;
+
+	endpoint =
+		fwnode_graph_get_endpoint_by_id(dev_fwnode(dev), 0, 0,
+						FWNODE_GRAPH_ENDPOINT_NEXT);
+	if (!endpoint) {
+		dev_err(dev, "endpoint node not found");
+		return -EPROBE_DEFER;
+	}
+
+	ret = v4l2_fwnode_endpoint_alloc_parse(endpoint, &bus_cfg);
+	if (ret) {
+		dev_err(dev, "parsing endpoint node failed");
+		goto out_err;
+	}
+
+	cfg = devm_kzalloc(dev, sizeof(*cfg), GFP_KERNEL);
+	if (!cfg)
+		goto out_err;
+
+	/* Check the number of MIPI CSI2 data lanes */
+	if (bus_cfg.bus.mipi_csi2.num_data_lanes != 2 ) {
+		dev_err(dev, "only 2 data lanes are currently supported");
+		goto out_err;
+	}
+
+	// ret = v4l2_link_freq_to_bitmap(dev, bus_cfg.link_frequencies,
+	// 			       bus_cfg.nr_of_link_frequencies,
+	// 			       link_freq_menu_items,
+	// 			       ARRAY_SIZE(link_freq_menu_items),
+	// 			       &isx031->link_freq_bitmap);
+	// if (ret)
+	// 	goto out_err;
+
+	v4l2_fwnode_endpoint_free(&bus_cfg);
+	fwnode_handle_put(endpoint);
+	return cfg;
+
+out_err:
+	v4l2_fwnode_endpoint_free(&bus_cfg);
+	fwnode_handle_put(endpoint);
+	return NULL;
+}
+
 #if LINUX_VERSION_CODE < KERNEL_VERSION(6, 1, 0)
 static int isx031_remove(struct i2c_client *client)
 #else
@@ -653,6 +709,11 @@ static int isx031_probe(struct i2c_client *client)
 		return -ENOMEM;
 
 	isx031->client = client;
+	isx031->hwcfg = isx031_get_hwcfg(isx031, &client->dev);
+	if (!isx031->hwcfg) {
+		dev_err(&client->dev, "no hwcfg provided\n");
+		return -EINVAL;
+	}
 	isx031->platform_data = client->dev.platform_data;
 	if (isx031->platform_data == NULL) {
 		dev_err(&client->dev, "no platform data provided\n");
@@ -727,6 +788,12 @@ probe_error_media_entity_cleanup:
 	return ret;
 }
 
+static const struct acpi_device_id isx031_acpi_ids[] = {
+	{ "INTC1031" },
+	{}
+};
+MODULE_DEVICE_TABLE(acpi, isx031_acpi_ids);
+
 static const struct dev_pm_ops isx031_pm_ops = {
 	SET_SYSTEM_SLEEP_PM_OPS(isx031_suspend, isx031_resume)
 };
@@ -741,6 +808,7 @@ static struct i2c_driver isx031_i2c_driver = {
 	.driver = {
 		.name = "isx031",
 		.pm = &isx031_pm_ops,
+		.acpi_match_table = ACPI_PTR(isx031_acpi_ids),
 	},
 #if LINUX_VERSION_CODE < KERNEL_VERSION(6, 6, 0)
 	.probe_new = isx031_probe,
