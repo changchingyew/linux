@@ -158,8 +158,10 @@ static int max_des_set_pipe_remaps(struct max_des_priv *priv,
 		if (ret)
 			return ret;
 	}
-
+	if(num_remaps > 0)
 	return des->ops->set_pipe_remaps_enable(des, pipe, GENMASK(num_remaps - 1, 0));
+	else
+		return 0;
 }
 
 static int max_des_set_phy_active(struct max_des *des, struct max_des_phy *phy,
@@ -1914,6 +1916,12 @@ static int max_des_update_pocs(struct max_des_priv *priv, bool enable)
 
 		if (!priv->pocs)
 			continue;
+
+		if (!priv->pocs[index]) {
+			dev_err(priv->dev,
+				"POC supply not available for port %u\n", index);
+			continue;
+		}
 
 		if (enable)
 			ret = regulator_enable(priv->pocs[index]);
