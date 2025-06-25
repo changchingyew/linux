@@ -250,8 +250,37 @@ static int i2c_acpi_get_info(struct acpi_device *adev,
 
 	if (adapter) {
 		/* The adapter must match the one in I2cSerialBus() connector */
-		if (ACPI_HANDLE(&adapter->dev) != lookup.adapter_handle)
-			return -ENODEV;
+		if (ACPI_HANDLE(&adapter->dev) != lookup.adapter_handle) {
+
+			/* if put DES0.ATR0 */
+			/* to be removed */
+			/* check if adapter is created by i2c-atr */
+			if (!strstr(adapter->name, "atr"))
+				return -ENODEV;
+			else {
+				/* handling for adapter created by i2c-atr */
+				printk(KERN_ERR "NKW %s: try WA for ATR adapter %s\n",__func__, adapter->name);
+
+				/* ATR adapter naming is i2c-X-atr-Y */
+				/* get ATR channel from ATR adapter naming */
+				int atr_channel = adapter->name[strlen(adapter->name) - 1];
+				int acpi_channel = -1;
+
+				/* Check if device have channel property */
+				if (fwnode_property_present(&adev->fwnode, "channel")) {
+					if (fwnode_property_read_u32(&adev->fwnode, "channel", &acpi_channel))
+						printk(KERN_ERR "failed to read channel property for %s\n", fwnode_get_name(&adev->fwnode));
+						return -ENODEV;
+				} else {
+					printk(KERN_ERR "channel property is not present for %s\n", fwnode_get_name(&adev->fwnode));
+					return -ENODEV;
+				}
+
+				if (atr_channel != acpi_channel) {
+					return -ENODEV;
+				}
+			}
+		}
 	} else {
 		struct acpi_device *adapter_adev;
 
@@ -259,6 +288,7 @@ static int i2c_acpi_get_info(struct acpi_device *adev,
 		adapter_adev = acpi_fetch_acpi_dev(lookup.adapter_handle);
 		if (!adapter_adev)
 			return -ENODEV;
+
 		if (acpi_bus_get_status(adapter_adev) ||
 		    !adapter_adev->status.present)
 			return -ENODEV;
@@ -284,6 +314,27 @@ static void i2c_acpi_register_device(struct i2c_adapter *adapter,
 	 */
 	if (acpi_quirk_skip_i2c_client_enumeration(adev))
 		return;
+
+	/* if adapter has atr name, only proceed with device channel matches atr id */
+	if (strstr(adapter->name, "atr")) {
+		int atr_channel = adapter->name[strlen(adapter->name) - 1] - '0';
+		u32 acpi_channel;
+
+		if (fwnode_property_present(&adev->fwnode, "channel")) {
+			if (fwnode_property_read_u32(&adev->fwnode, "channel", &acpi_channel)) {
+				printk(KERN_ERR "failed to read channel property for %s\n", fwnode_get_name(&adev->fwnode));
+				return;
+			}
+
+			if (atr_channel != acpi_channel) {
+				printk(KERN_ERR "ATR channel %d does not match channel %d in %s\n", atr_channel, acpi_channel, fwnode_get_name(&adev->fwnode));
+				return;
+			}
+		} else {
+			printk(KERN_ERR "channel property not present for %s\n", fwnode_get_name(&adev->fwnode));
+			return;
+		}
+	}
 
 	adev->power.flags.ignore_parent = true;
 	acpi_device_set_enumerated(adev);
@@ -322,8 +373,15 @@ void i2c_acpi_register_devices(struct i2c_adapter *adap)
 	struct acpi_device *adev;
 	acpi_status status;
 
-	if (!has_acpi_companion(&adap->dev))
-		return;
+	if (!has_acpi_companion(&adap->dev)) {
+		printk(KERN_ERR "NKW %s: no ACPI companion for adap->dev : adap->name(%s)\n",__func__, adap->name);
+
+		if (!adap->dev.fwnode) {
+			printk(KERN_ERR "NKW %s: adap->dev fwnode is NULL, cannot register devices\n", __func__);
+			return;
+		} else
+			printk(KERN_ERR "NKW %s: adap->dev fwnode name %s\n", __func__, fwnode_get_name(dev_fwnode(&adap->dev)));
+	}
 
 	status = acpi_walk_namespace(ACPI_TYPE_DEVICE, ACPI_ROOT_OBJECT,
 				     I2C_ACPI_MAX_SCAN_DEPTH,
