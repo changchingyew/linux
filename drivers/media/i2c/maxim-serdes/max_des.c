@@ -1038,6 +1038,7 @@ static int max_des_i2c_atr_init(struct max_des_priv *priv)
 		struct max_des_link *link = &des->links[i];
 		struct i2c_atr_adap_desc desc = {
 			.chan_id = i,
+			.bus_handle = dev_fwnode(priv->dev)
 		};
 
 		if (!link->enabled)
