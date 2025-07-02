@@ -1196,7 +1196,10 @@ int v4l2_subdev_get_fwnode_pad_1_to_1(struct media_entity *entity,
 	fwnode = fwnode_graph_get_port_parent(endpoint->local_fwnode);
 	fwnode_handle_put(fwnode);
 
-	if (device_match_fwnode(sd->dev, fwnode))
+	if (device_match_fwnode(sd->dev, endpoint->local_fwnode) || device_match_fwnode(sd->dev, fwnode))
+		return endpoint->port;
+
+	if (sd->fwnode->secondary == endpoint->local_fwnode || sd->fwnode->secondary == fwnode)
 		return endpoint->port;
 
 	return -ENXIO;
