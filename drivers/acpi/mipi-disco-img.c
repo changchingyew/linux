@@ -81,7 +81,8 @@ static acpi_status parse_csi2_resource(struct acpi_resource *res, void *context)
 	if (ACPI_FAILURE(acpi_get_handle(NULL, csi2_res_src->string_ptr,
 					 &remote_handle))) {
 		acpi_handle_debug(crwd->handle,
-				  "unable to find resource source\n");
+				  "unable to find resource source \"%s\"\n",
+					csi2_res_src->string_ptr);
 		return AE_OK;
 	}
 	csi2_res_src_length = csi2_res_src->string_length;
@@ -100,6 +101,11 @@ static acpi_status parse_csi2_resource(struct acpi_resource *res, void *context)
 	strscpy(conn->remote_name, csi2_res_src->string_ptr, csi2_res_src_length);
 	conn->csi2_data.resource_source.string_ptr = conn->remote_name;
 	conn->remote_handle = remote_handle;
+
+	acpi_handle_debug(crwd->handle,
+						"CSI-2 resource local port %u, phy type %u, remote \"%s\", remote port %u\n",
+						csi2_res->local_port_instance, csi2_res->phy_type,
+						csi2_res_src->string_ptr, csi2_res_src->index);
 
 	list_add(&conn->entry, &crwd->connections);
 
@@ -223,6 +229,9 @@ static void alloc_crs_csi2_swnodes(struct crs_csi2 *csi2)
 		return;
 	}
 
+	acpi_handle_debug(csi2->handle, "allocating memory for %zu ports\n",
+				port_count);
+
 	swnodes = kmalloc(alloc_size, GFP_KERNEL);
 	if (!swnodes)
 		return;
@@ -247,8 +256,9 @@ static void alloc_crs_csi2_swnodes(struct crs_csi2 *csi2)
 #define ACPI_CRS_CSI2_PHY_TYPE_C	0
 #define ACPI_CRS_CSI2_PHY_TYPE_D	1
 
-static unsigned int next_csi2_port_index(struct acpi_device_software_nodes *swnodes,
-					 unsigned int port_nr)
+static unsigned int next_csi2_port_index(acpi_handle handle,
+							struct acpi_device_software_nodes *swnodes,
+							unsigned int port_nr)
 {
 	unsigned int i;
 
@@ -259,10 +269,14 @@ static unsigned int next_csi2_port_index(struct acpi_device_software_nodes *swno
 			return i;
 
 		if (port->port_nr == NO_CSI2_PORT) {
+			acpi_handle_debug(handle, "allocate new port %u at index %u\n",
+				port_nr, i);
 			port->port_nr = port_nr;
 			return i;
 		}
 	}
+
+	acpi_handle_debug(handle, "port %u not found\n", port_nr);
 
 	return NO_CSI2_PORT;
 }
@@ -309,15 +323,19 @@ static void extract_crs_csi2_conn_info(acpi_handle local_handle,
 		return;
 	}
 
-	local_index = next_csi2_port_index(local_swnodes,
+	local_index = next_csi2_port_index(local_handle, local_swnodes,
 					   conn->csi2_data.local_port_instance);
 	if (WARN_ON_ONCE(local_index >= local_swnodes->num_ports))
 		return;
 
-	remote_index = next_csi2_port_index(remote_swnodes,
+	remote_index = next_csi2_port_index(conn->remote_handle, remote_swnodes,
 					    conn->csi2_data.resource_source.index);
 	if (WARN_ON_ONCE(remote_index >= remote_swnodes->num_ports))
 		return;
+
+	acpi_handle_debug(local_handle, "local node %u, remote \"%s\":%u %u\n",
+				local_index, conn->csi2_data.resource_source.string_ptr,
+				conn->csi2_data.resource_source.index, remote_index);
 
 	local_port = &local_swnodes->ports[local_index];
 	local_node = &local_swnodes->nodes[ACPI_DEVICE_SWNODE_EP(local_index)];
@@ -492,8 +510,13 @@ static void init_csi2_port(struct acpi_device *adev,
 	int num_lanes = 0;
 	int ret;
 
-	if (GRAPH_PORT_NAME(port->port_name, port->port_nr))
-		return;
+	acpi_handle_debug(handle, "Initialising CSI-2 port at %u\n", port_index);
+
+	if (GRAPH_PORT_NAME(port->port_name, port->port_nr)) {
+			acpi_handle_info(handle, "port node name too long for port %u\n",
+							port->port_nr);
+			return;
+	}
 
 	swnodes->nodes[ACPI_DEVICE_SWNODE_PORT(port_index)] =
 			SOFTWARE_NODE(port->port_name, port->port_props,
@@ -582,7 +605,7 @@ static void init_csi2_port(struct acpi_device *adev,
 static struct fwnode_handle *get_mipi_port_handle(struct fwnode_handle *adev_fwnode,
 						  unsigned int port_nr)
 {
-	char port_name[sizeof(MIPI_IMG_PORT_PREFIX) + 2];
+	char port_name[sizeof(MIPI_IMG_PORT_PREFIX) + 3];
 
 	if (snprintf(port_name, sizeof(port_name), "%s%u",
 		     MIPI_IMG_PORT_PREFIX, port_nr) >= sizeof(port_name))
@@ -612,8 +635,10 @@ static void init_crs_csi2_swnodes(struct crs_csi2 *csi2)
 		return;
 
 	adev = acpi_fetch_acpi_dev(handle);
-	if (!adev)
+	if (!adev) {
+		acpi_handle_warn(handle, "cannot fetch acpi device\n");
 		return;
+	}
 
 	adev_fwnode = acpi_fwnode_handle(adev);
 
@@ -672,8 +697,8 @@ static void init_crs_csi2_swnodes(struct crs_csi2 *csi2)
 		port_fwnode = get_mipi_port_handle(adev_fwnode, port->port_nr);
 		if (!port_fwnode) {
 			acpi_handle_info(handle,
-					 "MIPI port name too long for port %u\n",
-					 port->port_nr);
+					 "MIPI port name too long for port %pfw, %u\n",
+					 adev_fwnode, port->port_nr);
 			continue;
 		}
 

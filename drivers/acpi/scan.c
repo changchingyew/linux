@@ -2599,6 +2599,8 @@ int acpi_bus_scan(acpi_handle handle)
 	if (!device)
 		return -ENODEV;
 
+	acpi_handle_debug(handle, "Done scanning _CRS CSI2 resources\n");
+
 	/*
 	 * Set up ACPI _CRS CSI-2 software nodes using information extracted
 	 * from the _CRS CSI-2 resource descriptors during the ACPI namespace
