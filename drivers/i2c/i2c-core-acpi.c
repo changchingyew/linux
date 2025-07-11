@@ -149,6 +149,7 @@ static int i2c_acpi_do_lookup(struct acpi_device *adev,
 	struct list_head resource_list;
 	int ret;
 
+
 	if (acpi_bus_get_status(adev))
 		return -EINVAL;
 
@@ -255,7 +256,7 @@ static int i2c_acpi_get_info(struct acpi_device *adev,
 			/* if put DES0.ATR0 */
 			/* to be removed */
 			/* check if adapter is created by i2c-atr */
-			if (!strstr(adapter->name, "atr"))
+			if (!strstr(adapter->name, "atr") && !strstr(adapter->name, "mux"))
 				return -ENODEV;
 			else {
 				/* handling for adapter created by i2c-atr */
@@ -263,22 +264,31 @@ static int i2c_acpi_get_info(struct acpi_device *adev,
 
 				/* ATR adapter naming is i2c-X-atr-Y */
 				/* get ATR channel from ATR adapter naming */
-				int atr_channel = adapter->name[strlen(adapter->name) - 1];
+				int atr_channel = -1;
 				int acpi_channel = -1;
+				if (strstr(adapter->name, "atr"))
+					atr_channel = adapter->name[strlen(adapter->name) - 1] - '0';
+				else
+					atr_channel = adapter->name[strlen(adapter->name) - 2] - '0';
 
 				/* Check if device have channel property */
 				if (fwnode_property_present(&adev->fwnode, "channel")) {
-					if (fwnode_property_read_u32(&adev->fwnode, "channel", &acpi_channel))
+					if (fwnode_property_read_u32(&adev->fwnode, "channel", &acpi_channel)) {
 						printk(KERN_ERR "failed to read channel property for %s\n", fwnode_get_name(&adev->fwnode));
 						return -ENODEV;
+					}
 				} else {
 					printk(KERN_ERR "channel property is not present for %s\n", fwnode_get_name(&adev->fwnode));
 					return -ENODEV;
 				}
 
 				if (atr_channel != acpi_channel) {
+					printk(KERN_ERR "NKW %s: ATR channel %d does not match channel %d in %s\n",
+						__func__, atr_channel, acpi_channel, fwnode_get_name(&adev->fwnode));
 					return -ENODEV;
-				}
+				} else
+					printk(KERN_ERR "NKW %s: ATR channel %d matches channel %d in %s\n",
+						__func__, atr_channel, acpi_channel, fwnode_get_name(&adev->fwnode));
 			}
 		}
 	} else {
@@ -316,22 +326,29 @@ static void i2c_acpi_register_device(struct i2c_adapter *adapter,
 		return;
 
 	/* if adapter has atr name, only proceed with device channel matches atr id */
-	if (strstr(adapter->name, "atr")) {
-		int atr_channel = adapter->name[strlen(adapter->name) - 1] - '0';
+	if (strstr(adapter->name, "atr") || strstr(adapter->name, "mux")) {
+		printk("NKW %s: adapter->name(%s) has atr or mux in name, checking channel match\n", __func__, adapter->name);
+		int atr_channel;
 		u32 acpi_channel;
+		if (strstr(adapter->name, "atr")) {
+			atr_channel = adapter->name[strlen(adapter->name) - 1] - '0';
+		} else
+		// extract 0 from i2c-1-mux (chan_id 0)
+			atr_channel = adapter->name[strlen(adapter->name) - 2] - '0';
 
 		if (fwnode_property_present(&adev->fwnode, "channel")) {
 			if (fwnode_property_read_u32(&adev->fwnode, "channel", &acpi_channel)) {
-				printk(KERN_ERR "failed to read channel property for %s\n", fwnode_get_name(&adev->fwnode));
+				printk(KERN_ERR "NKW %s: failed to read channel property for %s\n", __func__, fwnode_get_name(&adev->fwnode));
 				return;
 			}
 
 			if (atr_channel != acpi_channel) {
-				printk(KERN_ERR "ATR channel %d does not match channel %d in %s\n", atr_channel, acpi_channel, fwnode_get_name(&adev->fwnode));
+				printk(KERN_ERR "NKW %s: ATR channel %d does not match channel %d in %s\n",__func__, atr_channel, acpi_channel, fwnode_get_name(&adev->fwnode));
 				return;
-			}
+			} else
+				printk(KERN_ERR "NKW %s: ATR channel %d matches channel %d in %s\n",__func__, atr_channel, acpi_channel, fwnode_get_name(&adev->fwnode));
 		} else {
-			printk(KERN_ERR "channel property not present for %s\n", fwnode_get_name(&adev->fwnode));
+			printk(KERN_ERR "NKW %s: channel property not present for %s\n",__func__, fwnode_get_name(&adev->fwnode));
 			return;
 		}
 	}
@@ -383,6 +400,14 @@ void i2c_acpi_register_devices(struct i2c_adapter *adap)
 			printk(KERN_ERR "NKW %s: adap->dev fwnode name %s\n", __func__, fwnode_get_name(dev_fwnode(&adap->dev)));
 	}
 
+	if (strstr(adap->name, "atr") || strstr(adap->name, "mux")) {
+		printk(KERN_ERR "NKW %s: adap->name(%s) has atr in name, checking for parent ACPI companion\n", __func__, adap->name);
+ 		if (adap->dev.parent && ACPI_COMPANION(adap->dev.parent)) {
+			printk(KERN_ERR "NKW %s: clear dependencies for adap->dev.parent\n", __func__);
+ 			acpi_dev_clear_dependencies(ACPI_COMPANION(adap->dev.parent));
+ 		}
+ 	}
+
 	status = acpi_walk_namespace(ACPI_TYPE_DEVICE, ACPI_ROOT_OBJECT,
 				     I2C_ACPI_MAX_SCAN_DEPTH,
 				     i2c_acpi_add_device, NULL,
@@ -397,6 +422,7 @@ void i2c_acpi_register_devices(struct i2c_adapter *adap)
 	if (!adev)
 		return;
 
+	printk(KERN_ERR "NKW %s clear dep for adapter %s\n", __func__, adap->name);
 	acpi_dev_clear_dependencies(adev);
 }
 
