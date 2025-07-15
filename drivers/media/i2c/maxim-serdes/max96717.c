@@ -209,6 +209,8 @@ static const struct regmap_config max96717_i2c_regmap = {
 	.max_register = 0x1f00,
 };
 
+#define MAX96717_REG13				0xD
+
 static int max96717_wait_for_device(struct max96717_priv *priv)
 {
 	unsigned int i;
@@ -216,6 +218,12 @@ static int max96717_wait_for_device(struct max96717_priv *priv)
 
 	for (i = 0; i < 10; i++) {
 		unsigned int val;
+
+		ret = regmap_read(priv->regmap, MAX96717_REG13, &val);
+		if( val == 0x91 )
+			pr_err("MAX9295A dev id:%X\n", val);
+		else
+			pr_err("non max9295 dev id:%X\n", val);
 
 		ret = regmap_read(priv->regmap, MAX96717_REG0, &val);
 		if (!ret && val)
@@ -1097,6 +1105,7 @@ static int max96717_set_i2c_xlate(struct max_ser *ser, unsigned int i,
 	struct max96717_priv *priv = ser_to_priv(ser);
 	int ret;
 
+	pr_err("%s: i2c_src: %u, i2c_dst: %u\n", __func__, xlate->src, xlate->dst);
 	ret = regmap_update_bits(priv->regmap, MAX96717_I2C_2(i),
 				 MAX96717_I2C_2_SRC,
 				 FIELD_PREP(MAX96717_I2C_2_SRC, xlate->src));
@@ -1354,6 +1363,8 @@ static int max96717_gpiochip_probe(struct max96717_priv *priv)
 	struct device *dev = priv->dev;
 	int ret;
 
+	pr_err("max96717_gpiochip_probe adaptor %x addr %x\n",
+	       priv->client->adapter->nr, priv->client->addr);
 	priv->pctldesc = (struct pinctrl_desc) {
 		.owner = THIS_MODULE,
 		.name = MAX96717_PINCTRL_NAME,
@@ -1391,6 +1402,7 @@ static int max96717_gpiochip_probe(struct max96717_priv *priv)
 		.set = max96717_gpio_set,
 	};
 
+	pr_err("max96717_gpiochip_probe complete\n");
 	return devm_gpiochip_add_data(dev, &priv->gc, priv);
 }
 
@@ -1400,6 +1412,9 @@ static int max96717_probe(struct i2c_client *client)
 	struct max96717_priv *priv;
 	struct max_ser_ops *ops;
 	int ret;
+
+	pr_err("max9295a_probe adaptor %x addr %x\n", client->adapter->nr,
+	       client->addr);
 
 	priv = devm_kzalloc(dev, sizeof(*priv), GFP_KERNEL);
 	if (!priv)

@@ -238,6 +238,7 @@ static int i2c_acpi_get_info(struct acpi_device *adev,
 	struct i2c_acpi_lookup lookup;
 	int ret;
 
+	// pr_err("i2c_acpi_get_info:%s", adapter->name);
 	memset(&lookup, 0, sizeof(lookup));
 	lookup.info = info;
 	lookup.index = -1;
@@ -252,7 +253,7 @@ static int i2c_acpi_get_info(struct acpi_device *adev,
 	if (adapter) {
 		/* The adapter must match the one in I2cSerialBus() connector */
 		if (ACPI_HANDLE(&adapter->dev) != lookup.adapter_handle) {
-
+			// pr_err("adapter name:%s", adapter->name);
 			/* if put DES0.ATR0 */
 			/* to be removed */
 			/* check if adapter is created by i2c-atr */
@@ -260,7 +261,7 @@ static int i2c_acpi_get_info(struct acpi_device *adev,
 				return -ENODEV;
 			else {
 				/* handling for adapter created by i2c-atr */
-				printk(KERN_ERR "NKW %s: try WA for ATR adapter %s\n",__func__, adapter->name);
+				int channel;
 
 				/* ATR adapter naming is i2c-X-atr-Y */
 				/* get ATR channel from ATR adapter naming */
@@ -278,7 +279,7 @@ static int i2c_acpi_get_info(struct acpi_device *adev,
 						return -ENODEV;
 					}
 				} else {
-					printk(KERN_ERR "channel property is not present for %s\n", fwnode_get_name(&adev->fwnode));
+					pr_err( "channel property is not present for %s\n", fwnode_get_name(&adev->fwnode));
 					return -ENODEV;
 				}
 
@@ -318,6 +319,7 @@ static void i2c_acpi_register_device(struct i2c_adapter *adapter,
 				     struct acpi_device *adev,
 				     struct i2c_board_info *info)
 {
+	pr_err("i2c_acpi_register_device\n");
 	/*
 	 * Skip registration on boards where the ACPI tables are
 	 * known to contain bogus I2C devices.
@@ -391,13 +393,13 @@ void i2c_acpi_register_devices(struct i2c_adapter *adap)
 	acpi_status status;
 
 	if (!has_acpi_companion(&adap->dev)) {
-		printk(KERN_ERR "NKW %s: no ACPI companion for adap->dev : adap->name(%s)\n",__func__, adap->name);
+		pr_err( "NKW %s: no ACPI companion for adap->dev : adap->name(%s)\n",__func__, adap->name);
 
 		if (!adap->dev.fwnode) {
-			printk(KERN_ERR "NKW %s: adap->dev fwnode is NULL, cannot register devices\n", __func__);
+			pr_err( "NKW %s: adap->dev fwnode is NULL, cannot register devices\n", __func__);
 			return;
 		} else
-			printk(KERN_ERR "NKW %s: adap->dev fwnode name %s\n", __func__, fwnode_get_name(dev_fwnode(&adap->dev)));
+			pr_err( "NKW %s: adap->dev fwnode name %s\n", __func__, fwnode_get_name(dev_fwnode(&adap->dev)));
 	}
 
 	if (strstr(adap->name, "atr") || strstr(adap->name, "mux")) {

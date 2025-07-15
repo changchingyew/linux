@@ -270,18 +270,38 @@ static int max_ser_i2c_mux_init(struct max_ser_priv *priv)
 
 static int max_ser_i2c_adapter_init(struct max_ser_priv *priv)
 {
-	if (device_get_named_child_node(priv->dev, "i2c-gate"))
-		return max_ser_i2c_mux_init(priv);
-	else
-		return max_ser_i2c_atr_init(priv);
+#ifdef CONFIG_OF
+    if (device_get_named_child_node(priv->dev, "i2c-gate"))
+        return max_ser_i2c_mux_init(priv);
+    else
+        return max_ser_i2c_atr_init(priv);
+#elif defined(CONFIG_ACPI)
+    if (fwnode_property_read_bool(dev_fwnode(priv->dev), "i2c-gate")) {
+        printk("NKW %s: i2c-gate property present.\n", __func__);
+        return max_ser_i2c_mux_init(priv);
+    } else {
+        printk("NKW %s: i2c-gate property not present.\n", __func__);
+        return max_ser_i2c_atr_init(priv);
+    }
+#endif
 }
 
 static void max_ser_i2c_adapter_deinit(struct max_ser_priv *priv)
 {
-	if (device_get_named_child_node(priv->dev, "i2c-gate"))
-		max_ser_i2c_mux_deinit(priv);
-	else
-		max_ser_i2c_atr_deinit(priv);
+#ifdef CONFIG_OF
+    if (device_get_named_child_node(priv->dev, "i2c-gate"))
+        return max_ser_i2c_mux_deinit(priv);
+    else
+        return max_ser_i2c_atr_deinit(priv);
+#elif defined(CONFIG_ACPI)
+    if (fwnode_property_read_bool(dev_fwnode(priv->dev), "i2c-gate")) {
+        printk("NKW %s: i2c-gate property present.\n", __func__);
+        return max_ser_i2c_mux_deinit(priv);
+    } else {
+        printk("NKW %s: i2c-gate property not present.\n", __func__);
+        return max_ser_i2c_atr_deinit(priv);
+    }
+#endif
 }
 
 static int max_ser_set_fmt(struct v4l2_subdev *sd,
@@ -1114,6 +1134,7 @@ static int max_ser_v4l2_register(struct max_ser_priv *priv)
 	unsigned int i;
 	int ret;
 
+	pr_err("max_ser_v4l2_register\n");
 	v4l2_i2c_subdev_init(sd, priv->client, &max_ser_subdev_ops);
 	i2c_set_clientdata(priv->client, data);
 	sd->entity.function = MEDIA_ENT_F_VID_IF_BRIDGE;
@@ -1148,6 +1169,8 @@ static int max_ser_v4l2_register(struct max_ser_priv *priv)
 	ret = v4l2_async_register_subdev(sd);
 	if (ret)
 		goto err_sd_cleanup;
+	pr_err("max_ser_v4l2_register complete\n");
+
 
 	return 0;
 
@@ -1183,6 +1206,8 @@ static int max_ser_parse_sink_dt_endpoint(struct max_ser_priv *priv,
 	struct fwnode_handle *ep;
 	int ret;
 
+	pr_err("max_ser_parse_sink_dt_endpoint\n");
+
 	ep = fwnode_graph_get_endpoint_by_id(fwnode, pad, 0, 0);
 	if (!ep)
 		return 0;
@@ -1208,6 +1233,7 @@ static int max_ser_parse_sink_dt_endpoint(struct max_ser_priv *priv,
 		return -EINVAL;
 	}
 
+	pr_err("max_ser_parse_sink_dt_endpoint completes\n");
 	phy->mipi = v4l2_ep.bus.mipi_csi2;
 	phy->enabled = true;
 
@@ -1335,6 +1361,8 @@ int max_ser_probe(struct i2c_client *client, struct max_ser *ser)
 	struct max_ser_priv *priv;
 	int ret;
 
+	pr_err("max_ser_probe 0\n");
+
 	priv = devm_kzalloc(dev, sizeof(*priv), GFP_KERNEL);
 	if (!priv)
 		return -ENOMEM;
@@ -1344,22 +1372,27 @@ int max_ser_probe(struct i2c_client *client, struct max_ser *ser)
 	priv->ser = ser;
 	ser->priv = priv;
 
+	pr_err("max_ser_probe 1\n");
 	ret = max_ser_allocate(priv);
 	if (ret)
 		return ret;
 
+	pr_err("max_ser_probe 2\n");
 	ret = max_ser_parse_dt(priv);
 	if (ret)
 		return ret;
 
+	pr_err("max_ser_probe 3\n");
 	ret = max_ser_init(priv);
 	if (ret)
 		return ret;
 
+	pr_err("max_ser_probe 4\n");
 	ret = max_ser_i2c_adapter_init(priv);
 	if (ret)
 		return ret;
 
+	pr_err("max_ser_probe 5\n");
 	ret = max_ser_v4l2_register(priv);
 	if (ret)
 		goto err_i2c_adapter_deinit;

@@ -361,6 +361,7 @@ static int isx031_identify_module(struct isx031 *isx031)
 	if (ret)
 		return ret;
 
+	pr_err("sensor in mode 0x%x", val);
 	dev_dbg(&client->dev, "sensor in mode 0x%x", val);
 
 	/* if sensor alreay in ISX031_STATE_STARTUP, can access i2c write directly*/
@@ -704,22 +705,28 @@ static int isx031_probe(struct i2c_client *client)
 	const struct isx031_reg_list *reg_list;
 	int ret;
 
+	pr_err("isx031_probe adaptor %x addr %x\n", client->adapter->nr,
+		client->addr);
 	isx031 = devm_kzalloc(&client->dev, sizeof(*isx031), GFP_KERNEL);
 	if (!isx031)
 		return -ENOMEM;
 
 	isx031->client = client;
+#if 0
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 12, 0)
 	isx031->hwcfg = isx031_get_hwcfg(isx031, &client->dev);
 	if (!isx031->hwcfg) {
 		dev_err(&client->dev, "no hwcfg provided\n");
 		return -EINVAL;
 	}
+#else
 	isx031->platform_data = client->dev.platform_data;
 	if (isx031->platform_data == NULL) {
 		dev_err(&client->dev, "no platform data provided\n");
 		return -EINVAL;
 	}
-
+#endif
+#endif
 	/* initialize subdevice */
 	sd = &isx031->sd;
 	v4l2_i2c_subdev_init(sd, client, &isx031_subdev_ops);
@@ -743,10 +750,11 @@ static int isx031_probe(struct i2c_client *client)
 		return ret;
 	}
 
+#if LINUX_VERSION_CODE < KERNEL_VERSION(6, 12, 0)
 	if (isx031->platform_data->suffix)
 		snprintf(isx031->sd.name, sizeof(isx031->sd.name), "isx031 %c",
 			 isx031->platform_data->suffix);
-
+#endif
 	mutex_init(&isx031->mutex);
 
 	/* 1920x1536 default */
@@ -778,6 +786,7 @@ static int isx031_probe(struct i2c_client *client)
 	pm_runtime_enable(&client->dev);
 	pm_runtime_idle(&client->dev);
 
+	pr_err("isx031_probe complete\n");
 	return 0;
 
 probe_error_media_entity_cleanup:

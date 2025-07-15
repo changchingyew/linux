@@ -876,34 +876,33 @@ static int max_des_init(struct max_des_priv *priv)
 	unsigned int i;
 	int ret;
 
-	dev_err(priv->dev, "des_init 1\n");
-#if 0
+	pr_err("des_init 1\n");
 	ret = des->ops->init(des);
 	if (ret)
 		return ret;
-#endif
 
-	dev_err(priv->dev, "des_init 2\n");
+	pr_err("des_init 2\n");
 	ret = des->ops->set_enable(des, false);
 	if (ret)
 		return ret;
 
-	dev_err(priv->dev, "des_init 3\n");
+	pr_err("des_init 3\n");
 	for (i = 0; i < des->ops->num_phys; i++) {
 		struct max_des_phy *phy = &des->phys[i];
 
+#if 0
 		if (phy->enabled) {
 			ret = des->ops->init_phy(des, phy);
 			if (ret)
 				return ret;
 		}
-
+#endif
 		ret = des->ops->set_phy_active(des, phy, false);
 		if (ret)
 			return ret;
 	}
 
-	dev_err(priv->dev, "des_init 4\n");
+	pr_err("des_init 4\n");
 	for (i = 0; i < des->ops->num_pipes; i++) {
 		struct max_des_pipe *pipe = &des->pipes[i];
 
@@ -930,7 +929,7 @@ static int max_des_init(struct max_des_priv *priv)
 	if (!des->ops->init_link)
 		return 0;
 
-	dev_err(priv->dev, "des_init 5\n");
+	pr_err("des_init 5\n");
 	for (i = 0; i < des->ops->num_links; i++) {
 		struct max_des_link *link = &des->links[i];
 
@@ -954,6 +953,7 @@ static int max_des_ser_atr_attach_addr(struct i2c_atr *atr, u32 chan_id,
 	unsigned int i;
 	int ret;
 
+	pr_err("des_ser_atr_attach_addr 1\n");
 	if (link->ser_xlate.en) {
 		dev_err(priv->dev, "Serializer for link %u already bound\n",
 			link->index);
@@ -1022,10 +1022,12 @@ static int max_des_i2c_atr_init(struct max_des_priv *priv)
 	unsigned int i;
 	int ret;
 
+	pr_err("des_i2c_atr_init 1\n");
 	if (!i2c_check_functionality(priv->client->adapter,
 				     I2C_FUNC_SMBUS_WRITE_BYTE_DATA))
 		return -ENODEV;
 
+	pr_err("des_i2c_atr_init 2\n");
 	priv->atr = i2c_atr_new(priv->client->adapter, priv->dev,
 				&max_des_i2c_atr_ops, des->ops->num_links,
 				I2C_ATR_F_STATIC | I2C_ATR_F_PASSTHROUGH);
@@ -1034,6 +1036,7 @@ static int max_des_i2c_atr_init(struct max_des_priv *priv)
 
 	i2c_atr_set_driver_data(priv->atr, priv);
 
+	pr_err("des_i2c_atr_init 3\n");
 	for (i = 0; i < des->ops->num_links; i++) {
 		struct max_des_link *link = &des->links[i];
 		struct i2c_atr_adap_desc desc = {
@@ -1049,6 +1052,7 @@ static int max_des_i2c_atr_init(struct max_des_priv *priv)
 			goto err_add_adapters;
 	}
 
+	pr_err("des_i2c_atr_init 4\n");
 	for (i = 0; i < des->ops->num_links; i++) {
 		struct max_des_link *link = &des->links[i];
 
@@ -1076,6 +1080,7 @@ static int max_des_i2c_mux_select(struct i2c_mux_core *muxc, u32 chan)
 	struct max_des_priv *priv = i2c_mux_priv(muxc);
 	struct max_des *des = priv->des;
 
+	// pr_err("max_des_i2c_mux_select 1\n");
 	if (!des->ops->select_links)
 		return 0;
 
@@ -1089,6 +1094,7 @@ static int max_des_i2c_mux_init(struct max_des_priv *priv)
 	unsigned int i;
 	int ret;
 
+	pr_err("max_des_i2c_mux_init 1\n");
 	if (des->ops->num_links == 1)
 		flags |= I2C_MUX_GATE;
 
@@ -1106,6 +1112,7 @@ static int max_des_i2c_mux_init(struct max_des_priv *priv)
 		if (!link->enabled)
 			continue;
 
+		pr_err("i2c_mux_add_adapter:%d\n", i);
 		ret = i2c_mux_add_adapter(priv->mux, 0, i);
 		if (ret)
 			goto err_add_adapters;
@@ -2326,6 +2333,7 @@ int max_des_probe(struct i2c_client *client, struct max_des *des)
 	if (ret)
 		goto err_i2c_adapter_deinit;
 
+	pr_err("des_probe complete\n");
 	return 0;
 
 err_i2c_adapter_deinit:

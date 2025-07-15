@@ -201,14 +201,23 @@ struct max9296a_chip_info {
 #define des_to_priv(_des) \
 	container_of(_des, struct max9296a_priv, des)
 
+#define MAX9296A_REG13				0xD
+
 static int max9296a_wait_for_device(struct max9296a_priv *priv)
 {
 	unsigned int i;
 	int ret;
 
+	pr_err("max9296a_wait_for_device\n");
 	for (i = 0; i < 10; i++) {
 		unsigned int val;
 
+		ret = regmap_read(priv->regmap, MAX9296A_REG13, &val);
+		if( val == 0x94 )
+			pr_err("max9296 dev id:%X\n", val);
+		else
+			pr_err("non max9296 dev id:%X\n", val);
+		
 		ret = regmap_read(priv->regmap, MAX9296A_REG0, &val);
 		if (!ret && val)
 			return 0;
@@ -353,6 +362,7 @@ static int max9296a_init_phy(struct max_des *des, struct max_des_phy *phy)
 	unsigned int i;
 	int ret;
 
+	pr_err("max9296a_init_phy 1\n");
 	if (is_cphy && !priv->info->supports_cphy) {
 		dev_err(priv->dev, "CPHY not supported\n");
 		return -EINVAL;
@@ -957,7 +967,8 @@ static int max9296a_probe(struct i2c_client *client)
 	struct max_des_ops *ops;
 	int ret;
 
-	pr_err("max9296a_probe 0\n");
+	pr_err("max9296a_probe adaptor %x addr %x\n", client->adapter->nr,
+	       client->addr);
 	priv = devm_kzalloc(dev, sizeof(*priv), GFP_KERNEL);
 	if (!priv)
 		return -ENOMEM;
@@ -1046,12 +1057,21 @@ static const struct max9296a_chip_info max9296a_info = {
 	.set_pipe_stream_id = max9296a_set_pipe_stream_id,
 	.set_pipe_enable = max9296a_set_pipe_enable,
 	.select_links = max9296a_select_links,
+#if 1
 	.select_resets_link = true,
+#else
+	.select_resets_link = false,
+#endif
 	.phys_configs = {
 		.num_configs = ARRAY_SIZE(max9296a_phys_configs),
 		.configs = max9296a_phys_configs,
 	},
+#if 0
 	.phy0_lanes_0_1_on_second_phy = true,
+#else
+	.phy0_lanes_0_1_on_second_phy = false,
+	.supports_cphy = false,
+#endif
 	.fix_tx_ids = true,
 	.num_pipes = 4,
 	.pipe_hw_ids = { 0, 1, 2, 3 },

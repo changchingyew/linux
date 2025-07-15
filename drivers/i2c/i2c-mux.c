@@ -371,6 +371,9 @@ int i2c_mux_add_adapter(struct i2c_mux_core *muxc,
 	if (dev_fwnode(muxc->dev))
 		device_set_node(&priv->adap.dev, dev_fwnode(muxc->dev));
 
+	if (dev_fwnode(muxc->dev))
+        device_set_node(&priv->adap.dev, dev_fwnode(muxc->dev));
+
 	if (force_nr) {
 		priv->adap.nr = force_nr;
 		ret = i2c_add_numbered_adapter(&priv->adap);

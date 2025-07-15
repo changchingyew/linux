@@ -181,6 +181,7 @@ static struct i2c_atr_alias_pair *i2c_atr_create_c2a(struct i2c_atr_chan *chan,
 {
 	struct i2c_atr_alias_pair *c2a;
 
+	pr_err("i2c_atr_create_c2a: addr=0x%02x, alias=0x%02x\n", addr, alias);
 	lockdep_assert_held(&chan->alias_pairs_lock);
 
 	c2a = kzalloc(sizeof(*c2a), GFP_KERNEL);
@@ -208,10 +209,12 @@ static int i2c_atr_reserve_alias(struct i2c_atr_alias_pool *alias_pool)
 	unsigned long idx;
 	u16 alias;
 
+	pr_err("i2c_atr_reserve_alias: alias_pool=%p\n", alias_pool);
 	spin_lock(&alias_pool->lock);
 
 	idx = find_first_zero_bit(alias_pool->use_mask, alias_pool->size);
 	if (idx >= alias_pool->size) {
+		pr_err("i2c_atr_reserve_alias: idx >= alias_pool->size\n");
 		spin_unlock(&alias_pool->lock);
 		return -EBUSY;
 	}
@@ -265,6 +268,7 @@ i2c_atr_replace_mapping_by_addr(struct i2c_atr_chan *chan, u16 addr)
 	u16 alias;
 	int ret;
 
+	pr_err("i2c_atr_replace_mapping_by_addr: addr=0x%02x\n", addr);
 	lockdep_assert_held(&chan->alias_pairs_lock);
 
 	alias_pairs = &chan->alias_pairs;
@@ -306,6 +310,7 @@ i2c_atr_create_mapping_by_addr(struct i2c_atr_chan *chan, u16 addr)
 	u16 alias;
 	int ret;
 
+	pr_err("i2c_atr_create_mapping_by_addr: addr=0x%02x\n", addr);
 	lockdep_assert_held(&chan->alias_pairs_lock);
 
 	ret = i2c_atr_reserve_alias(chan->alias_pool);
@@ -314,10 +319,12 @@ i2c_atr_create_mapping_by_addr(struct i2c_atr_chan *chan, u16 addr)
 
 	alias = ret;
 
+	pr_err("i2c_atr_create_mapping_by_addr 2\n");
 	c2a = i2c_atr_create_c2a(chan, alias, addr);
 	if (!c2a)
 		goto err_release_alias;
 
+	pr_err("i2c_atr_create_mapping_by_addr 3\n");
 	ret = atr->ops->attach_addr(atr, chan->chan_id, c2a->addr, c2a->alias);
 	if (ret) {
 		dev_err(atr->dev, "failed to attach 0x%02x on channel %d: err %d\n",
@@ -325,6 +332,7 @@ i2c_atr_create_mapping_by_addr(struct i2c_atr_chan *chan, u16 addr)
 		goto err_del_c2a;
 	}
 
+	pr_err("i2c_atr_create_mapping_by_addr 4\n");
 	return c2a;
 
 err_del_c2a:
@@ -340,6 +348,7 @@ i2c_atr_get_mapping_by_addr(struct i2c_atr_chan *chan, u16 addr)
 	struct i2c_atr *atr = chan->atr;
 	struct i2c_atr_alias_pair *c2a;
 
+	// pr_err("i2c_atr_get_mapping_by_addr: addr=0x%02x\n", addr);
 	c2a = i2c_atr_find_mapping_by_addr(chan, addr);
 	if (c2a)
 		return c2a;
@@ -545,6 +554,7 @@ static int i2c_atr_attach_addr(struct i2c_adapter *adapter,
 	struct i2c_atr_alias_pair *c2a;
 	int ret = 0;
 
+	pr_err("i2c_atr_attach_addr: addr=0x%02x\n", addr);
 	mutex_lock(&chan->alias_pairs_lock);
 
 	c2a = i2c_atr_create_mapping_by_addr(chan, addr);
