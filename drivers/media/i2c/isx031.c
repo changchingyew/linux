@@ -17,8 +17,10 @@
 #include <media/v4l2-ctrls.h>
 #include <media/v4l2-device.h>
 #include <media/v4l2-fwnode.h>
-#include <media/isx031.h>
-
+#include <media/i2c/isx031.h>
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 10, 0)
+#include <media/mipi-csi2.h>
+#endif
 #define to_isx031(_sd)			container_of(_sd, struct isx031, sd)
 
 #define ISX031_REG_MODE_SELECT		0x8A01
@@ -88,6 +90,8 @@ struct isx031 {
 	struct i2c_client *client;
 
 	struct isx031_platform_data *platform_data;
+	
+	struct gpio_desc *reset_gpio;
 	struct isx031_hwcfg *hwcfg;
 
 	/* Streaming on/off */
@@ -98,6 +102,16 @@ static const struct isx031_reg isx031_init_reg[] = {
 	{ISX031_REG_LEN_08BIT, 0xFFFF, 0x00}, // select mode
 	{ISX031_REG_LEN_08BIT, 0x0171, 0x00}, // close F_EBD
 	{ISX031_REG_LEN_08BIT, 0x0172, 0x00}, // close R_EBD
+	/* External sync */
+	{ISX031_REG_LEN_08BIT, 0xBF14, 0x01}, /* SG_MODE_APL */
+	{ISX031_REG_LEN_08BIT, 0x8AFF, 0x0c}, /*  Hi-Z (input setting or output disabled) */
+	{ISX031_REG_LEN_08BIT, 0x0153, 0x00},
+	{ISX031_REG_LEN_08BIT, 0x8AF0, 0x01}, /* external pulse-based sync */
+	{ISX031_REG_LEN_08BIT, 0x0144, 0x00},
+	{ISX031_REG_LEN_08BIT, 0x8AF1, 0x00},
+};
+
+static const struct isx031_reg isx031_framesync_reg[] = {
 	/* External sync */
 	{ISX031_REG_LEN_08BIT, 0xBF14, 0x01}, /* SG_MODE_APL */
 	{ISX031_REG_LEN_08BIT, 0x8AFF, 0x0c}, /*  Hi-Z (input setting or output disabled) */
@@ -179,6 +193,11 @@ static const struct isx031_reg_list isx031_init_reg_list = {
 	.regs = isx031_init_reg,
 };
 
+static const struct isx031_reg_list isx031_framesync_reg_list = {
+	.num_of_regs = ARRAY_SIZE(isx031_framesync_reg),
+	.regs = isx031_framesync_reg,
+};
+
 static const struct isx031_reg_list isx031_1920_1536_30fps_reg_list = {
 	.num_of_regs = ARRAY_SIZE(isx031_1920_1536_30fps_reg),
 	.regs = isx031_1920_1536_30fps_reg,
@@ -217,6 +236,22 @@ static const struct isx031_mode supported_modes[] = {
 		.reg_list = isx031_1920_1536_30fps_reg_list,
 	},
 };
+
+static int isx031_reset(struct gpio_desc *reset_gpio)
+{
+	if (!IS_ERR_OR_NULL(reset_gpio)) {
+		pr_err("isx031_reset\n");
+		gpiod_set_value_cansleep(reset_gpio, 0);
+		usleep_range(500, 1000);
+		gpiod_set_value_cansleep(reset_gpio, 1);
+		/*Needs to sleep for quite a while before register writes*/
+		usleep_range(200 * 1000, 200 * 1000 + 500);
+
+		return 0;
+	}
+
+	return -EINVAL;
+}
 
 static int isx031_read_reg(struct isx031 *isx031, u16 reg, u16 len, u32 *val)
 {
@@ -452,6 +487,20 @@ static int isx031_set_stream(struct v4l2_subdev *sd, int enable)
 	return ret;
 }
 
+static int isx031_enable_streams(struct v4l2_subdev *subdev,
+	struct v4l2_subdev_state *state,
+	u32 pad, u64 streams_mask)
+{
+	return isx031_set_stream(subdev, true);
+}
+
+static int isx031_disable_streams(struct v4l2_subdev *subdev,
+	 struct v4l2_subdev_state *state,
+	 u32 pad, u64 streams_mask)
+{
+	return isx031_set_stream(subdev, false);
+}
+
 static int __maybe_unused isx031_suspend(struct device *dev)
 {
 	struct i2c_client *client = to_i2c_client(dev);
@@ -474,6 +523,9 @@ static int __maybe_unused isx031_resume(struct device *dev)
 	struct isx031 *isx031 = to_isx031(sd);
 	const struct isx031_reg_list *reg_list;
 	int ret;
+
+	if (isx031->reset_gpio != NULL)
+		isx031_reset(isx031->reset_gpio);
 
 	ret = isx031_identify_module(isx031);
 	if (ret == 0) {
@@ -500,6 +552,72 @@ static int __maybe_unused isx031_resume(struct device *dev)
 	}
 
 	mutex_unlock(&isx031->mutex);
+
+	return 0;
+}
+
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 10, 0)
+static unsigned int isx031_mbus_code_to_mipi(u32 code)
+{
+	switch (code) {
+	case MEDIA_BUS_FMT_RGB565_1X16:
+		return MIPI_CSI2_DT_RGB565;
+	case MEDIA_BUS_FMT_RGB888_1X24:
+		return MIPI_CSI2_DT_RGB888;
+	case MEDIA_BUS_FMT_UYVY8_1X16:
+	case MEDIA_BUS_FMT_YUYV8_1X16:
+		return MIPI_CSI2_DT_YUV422_8B;
+	case MEDIA_BUS_FMT_SBGGR16_1X16:
+	case MEDIA_BUS_FMT_SGBRG16_1X16:
+	case MEDIA_BUS_FMT_SGRBG16_1X16:
+	case MEDIA_BUS_FMT_SRGGB16_1X16:
+		return MIPI_CSI2_DT_RAW16;
+	case MEDIA_BUS_FMT_SBGGR12_1X12:
+	case MEDIA_BUS_FMT_SGBRG12_1X12:
+	case MEDIA_BUS_FMT_SGRBG12_1X12:
+	case MEDIA_BUS_FMT_SRGGB12_1X12:
+		return MIPI_CSI2_DT_RAW12;
+	case MEDIA_BUS_FMT_SBGGR10_1X10:
+	case MEDIA_BUS_FMT_SGBRG10_1X10:
+	case MEDIA_BUS_FMT_SGRBG10_1X10:
+	case MEDIA_BUS_FMT_SRGGB10_1X10:
+		return MIPI_CSI2_DT_RAW10;
+	case MEDIA_BUS_FMT_SBGGR8_1X8:
+	case MEDIA_BUS_FMT_SGBRG8_1X8:
+	case MEDIA_BUS_FMT_SGRBG8_1X8:
+	case MEDIA_BUS_FMT_SRGGB8_1X8:
+		return MIPI_CSI2_DT_RAW8;
+	default:
+		/* return unavailable MIPI data type - 0x3f */
+		WARN_ON(1);
+		return 0x3f;
+	}
+}
+#endif
+
+static int isx031_get_frame_desc(struct v4l2_subdev *sd,
+	unsigned int pad, struct v4l2_mbus_frame_desc *desc)
+{
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 10, 0)
+	struct isx031 *isx031 = to_isx031(sd);
+#endif
+	unsigned int i;
+
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 10, 0)
+	desc->type = V4L2_MBUS_FRAME_DESC_TYPE_CSI2;
+#endif
+	desc->num_entries = V4L2_FRAME_DESC_ENTRY_MAX;
+
+	for (i = 0; i < desc->num_entries; i++) {
+		desc->entry[i].flags = 0;
+		desc->entry[i].pixelcode = MEDIA_BUS_FMT_FIXED;
+		desc->entry[i].length = 0;
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 10, 0)
+		desc->entry[i].stream = i;
+		desc->entry[i].bus.csi2.vc = i;
+		desc->entry[i].bus.csi2.dt = isx031_mbus_code_to_mipi(isx031->cur_mode->code);
+#endif
+	}
 
 	return 0;
 }
@@ -613,6 +731,9 @@ static const struct v4l2_subdev_video_ops isx031_video_ops = {
 static const struct v4l2_subdev_pad_ops isx031_pad_ops = {
 	.set_fmt = isx031_set_format,
 	.get_fmt = isx031_get_format,
+	.get_frame_desc = isx031_get_frame_desc,
+	.enable_streams = isx031_enable_streams,
+	.disable_streams = isx031_disable_streams,
 };
 
 static const struct v4l2_subdev_ops isx031_subdev_ops = {
@@ -712,7 +833,7 @@ static int isx031_probe(struct i2c_client *client)
 		return -ENOMEM;
 
 	isx031->client = client;
-#if 0
+
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 12, 0)
 	isx031->hwcfg = isx031_get_hwcfg(isx031, &client->dev);
 	if (!isx031->hwcfg) {
@@ -726,11 +847,25 @@ static int isx031_probe(struct i2c_client *client)
 		return -EINVAL;
 	}
 #endif
-#endif
+
+	isx031->reset_gpio = devm_gpiod_get_optional(&client->dev, "reset",
+						     GPIOD_OUT_HIGH);
+	if (IS_ERR(isx031->reset_gpio))
+		return -EPROBE_DEFER;
+	else if (isx031->reset_gpio == NULL)
+		dev_warn(&client->dev, "Reset GPIO not found");
+	else {
+		dev_dbg(&client->dev, "Found reset GPIO");
+		isx031_reset(isx031->reset_gpio);
+	}
 	/* initialize subdevice */
 	sd = &isx031->sd;
 	v4l2_i2c_subdev_init(sd, client, &isx031_subdev_ops);
+#if LINUX_VERSION_CODE < KERNEL_VERSION(6, 10, 0)
 	sd->flags |= V4L2_SUBDEV_FL_HAS_DEVNODE | V4L2_SUBDEV_FL_HAS_EVENTS;
+#else
+	sd->flags |= V4L2_SUBDEV_FL_HAS_DEVNODE;
+#endif
 	sd->internal_ops = &isx031_internal_ops;
 	sd->entity.ops = &isx031_subdev_entity_ops;
 	sd->entity.function = MEDIA_ENT_F_CAM_SENSOR;
