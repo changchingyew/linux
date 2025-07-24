@@ -890,13 +890,12 @@ static int max_des_init(struct max_des_priv *priv)
 	for (i = 0; i < des->ops->num_phys; i++) {
 		struct max_des_phy *phy = &des->phys[i];
 
-#if 0
 		if (phy->enabled) {
 			ret = des->ops->init_phy(des, phy);
 			if (ret)
 				return ret;
 		}
-#endif
+
 		ret = des->ops->set_phy_active(des, phy, false);
 		if (ret)
 			return ret;
