@@ -98,7 +98,12 @@ s64 ipu6_isys_csi2_get_link_freq(struct ipu6_isys_csi2 *csi2)
 	if (WARN(!ext_sd, "Failed to get subdev for %s\n", csi2->asd.sd.name))
 		return -ENODEV;
 
-	return v4l2_get_link_freq(ext_sd->ctrl_handler, 0, 0);
+	if (ext_sd->ctrl_handler)
+		return v4l2_get_link_freq(ext_sd->ctrl_handler, 0, 0);
+	else if (src_pad)
+		return v4l2_get_link_freq(src_pad, 0, 0);
+	else
+		return -EINVAL;
 }
 
 static int csi2_subscribe_event(struct v4l2_subdev *sd, struct v4l2_fh *fh,
