@@ -764,12 +764,19 @@ static int max96717_gpio_get(struct gpio_chip *gc, unsigned int offset)
 	return pinconf_to_config_argument(config);
 }
 
-static int max96717_gpio_set(struct gpio_chip *gc, unsigned int offset, int value)
+//static int max96717_gpio_set(struct gpio_chip *gc, unsigned int offset, int value) // 6.15
+static void max96717_gpio_set(struct gpio_chip *gc, unsigned int offset, int value)
 {
 	unsigned long config = pinconf_to_config_packed(PIN_CONFIG_OUTPUT, value);
 	struct max96717_priv *priv = gpiochip_get_data(gc);
+	int ret;
 
-	return max96717_conf_pin_config_set_one(priv, offset, config);
+	ret = max96717_conf_pin_config_set_one(priv, offset, config);
+	if (ret)
+		 dev_err(priv->dev, "Failed to set GPIO %u output value, err: %d\n",
+-                       offset, ret);
+
+	// return max96717_conf_pin_config_set_one(priv, offset, config);
 }
 
 static unsigned int max96717_pipe_id(struct max96717_priv *priv,
@@ -1312,8 +1319,10 @@ static const struct pinctrl_ops max96717_ctrl_ops = {
 	.get_groups_count = max96717_ctrl_get_groups_count,
 	.get_group_name = max96717_ctrl_get_group_name,
 	.get_group_pins = max96717_ctrl_get_group_pins,
+#ifdef CONFIG_OF
 	.dt_node_to_map = pinconf_generic_dt_node_to_map_pin,
 	.dt_free_map = pinconf_generic_dt_free_map,
+#endif
 };
 
 static const struct pinconf_ops max96717_conf_ops = {
@@ -1573,7 +1582,8 @@ static int max96717_gpiochip_probe(struct max96717_priv *priv)
 		.direction_input = max96717_gpio_direction_input,
 		.direction_output = max96717_gpio_direction_output,
 		.get = max96717_gpio_get,
-		.set_rv = max96717_gpio_set,
+		//.set_rv = max96717_gpio_set,
+		.set = max96717_gpio_set, //6.15
 	};
 
 	return devm_gpiochip_add_data(dev, &priv->gc, priv);
@@ -1663,6 +1673,12 @@ static const struct max96717_chip_info max96717_info = {
 	.phy_hw_ids = { 1 },
 };
 
+static const struct acpi_device_id max9295a_acpi_ids[] = {
+       { "INTC1138", .driver_data = (kernel_ulong_t)&max9295a_info},
+       {}
+};
+MODULE_DEVICE_TABLE(acpi, max9295a_acpi_ids);
+
 static const struct of_device_id max96717_of_ids[] = {
 	{ .compatible = "maxim,max9295a", .data = &max9295a_info },
 	{ .compatible = "maxim,max96717", .data = &max96717_info },
@@ -1676,6 +1692,7 @@ static struct i2c_driver max96717_i2c_driver = {
 	.driver	= {
 		.name = MAX96717_NAME,
 		.of_match_table = max96717_of_ids,
+		.acpi_match_table = ACPI_PTR(max9295a_acpi_ids),
 	},
 	.probe = max96717_probe,
 	.remove = max96717_remove,
@@ -1683,7 +1700,7 @@ static struct i2c_driver max96717_i2c_driver = {
 
 module_i2c_driver(max96717_i2c_driver);
 
-MODULE_IMPORT_NS("MAX_SERDES");
+MODULE_IMPORT_NS(MAX_SERDES);
 MODULE_DESCRIPTION("MAX96717 GMSL2 Serializer Driver");
 MODULE_AUTHOR("Cosmin Tanislav <cosmin.tanislav@analog.com>");
 MODULE_LICENSE("GPL");

@@ -770,6 +770,7 @@ static int __max_ser_set_routing(struct v4l2_subdev *sd,
 	bool is_tpg = false;
 	int ret;
 
+	printk("NKW %s, call v4l2_subdev_routing_validate\n", __func__);
 	ret = v4l2_subdev_routing_validate(sd, routing,
 					   V4L2_SUBDEV_ROUTING_ONLY_1_TO_1 |
 					   V4L2_SUBDEV_ROUTING_NO_SINK_STREAM_MIX);
@@ -783,9 +784,11 @@ static int __max_ser_set_routing(struct v4l2_subdev *sd,
 		}
 	}
 
+	printk("NKW max_ser_set_routing: %s, is_tpg: %d\n", __func__, is_tpg);
 	if (is_tpg)
 		return max_ser_set_tpg_routing(sd, state, routing);
 
+	printk("NKW %s, call v4l2_subdev_set_routing\n", __func__);
 	return v4l2_subdev_set_routing(sd, state, routing);
 }
 
@@ -1301,6 +1304,7 @@ static int max_ser_disable_streams(struct v4l2_subdev *sd,
 static int max_ser_init_state(struct v4l2_subdev *sd,
 			      struct v4l2_subdev_state *state)
 {
+	printk("NKW %s\n", __func__);
 	struct v4l2_subdev_route routes[MAX_SER_NUM_PHYS] = { 0 };
 	struct v4l2_subdev_krouting routing = {
 		.routes = routes,
@@ -1312,9 +1316,11 @@ static int max_ser_init_state(struct v4l2_subdev *sd,
 
 	for (i = 0; i < ser->ops->num_phys; i++) {
 		struct max_ser_phy *phy = &ser->phys[i];
+		printk("NKW %s %d\n", __func__, __LINE__);
 
 		if (!phy->enabled)
 			continue;
+		printk("NKW %s %d\n", __func__, __LINE__);
 
 		routing.routes[routing.num_routes++] = (struct v4l2_subdev_route) {
 			.sink_pad = max_ser_phy_to_pad(ser, phy),
@@ -1333,6 +1339,7 @@ static int max_ser_init_state(struct v4l2_subdev *sd,
 		 */
 		break;
 	}
+		printk("NKW %s %d\n", __func__, __LINE__);
 
 	return __max_ser_set_routing(sd, state, &routing);
 }
@@ -1593,7 +1600,8 @@ static int max_ser_v4l2_register(struct max_ser_priv *priv)
 	v4l2_i2c_subdev_init(sd, priv->client, &max_ser_subdev_ops);
 	i2c_set_clientdata(priv->client, data);
 	sd->internal_ops = &max_ser_internal_ops;
-	sd->entity.function = MEDIA_ENT_F_VID_IF_BRIDGE;
+	//sd->entity.function = MEDIA_ENT_F_VID_IF_BRIDGE;
+	sd->entity.function = MEDIA_ENT_F_VID_MUX;
 	sd->entity.ops = &max_ser_media_ops;
 	sd->flags |= V4L2_SUBDEV_FL_HAS_DEVNODE | V4L2_SUBDEV_FL_STREAMS;
 
@@ -1607,8 +1615,8 @@ static int max_ser_v4l2_register(struct max_ser_priv *priv)
 		else if (max_ser_pad_is_source(ser, i))
 			priv->pads[i].flags = MEDIA_PAD_FL_SOURCE;
 		else if (max_ser_pad_is_tpg(ser, i))
-			priv->pads[i].flags = MEDIA_PAD_FL_SINK |
-					      MEDIA_PAD_FL_INTERNAL;
+			priv->pads[i].flags = MEDIA_PAD_FL_SINK;// |
+					      //MEDIA_PAD_FL_INTERNAL;
 		else
 			return -EINVAL;
 	}
@@ -1639,14 +1647,19 @@ static int max_ser_v4l2_register(struct max_ser_priv *priv)
 	ret = max_ser_v4l2_notifier_register(priv);
 	if (ret)
 		goto err_media_entity_cleanup;
-
+printk("NKW %s %d\n", __func__, __LINE__);
 	ret = v4l2_subdev_init_finalize(sd);
 	if (ret)
 		goto err_nf_cleanup;
-
+printk("NKW %s %d\n", __func__, __LINE__);
 	ret = v4l2_async_register_subdev(sd);
 	if (ret)
 		goto err_sd_cleanup;
+printk("NKW %s %d\n", __func__, __LINE__);
+
+	if (!sd->flags & V4L2_SUBDEV_FL_HAS_DEVNODE) {
+		dev_err(priv->dev, "Subdev %s does not have a devnode\n",sd->name);
+	}
 
 	return 0;
 
@@ -1862,7 +1875,7 @@ int max_ser_probe(struct i2c_client *client, struct max_ser *ser)
 	ret = max_ser_v4l2_register(priv);
 	if (ret)
 		goto err_i2c_adapter_deinit;
-
+printk("NKW %s %d\n", __func__, __LINE__);
 	return 0;
 
 err_i2c_adapter_deinit:
@@ -1870,7 +1883,7 @@ err_i2c_adapter_deinit:
 
 	return ret;
 }
-EXPORT_SYMBOL_NS_GPL(max_ser_probe, "MAX_SERDES");
+EXPORT_SYMBOL_NS_GPL(max_ser_probe, MAX_SERDES);
 
 int max_ser_remove(struct max_ser *ser)
 {
@@ -1882,7 +1895,7 @@ int max_ser_remove(struct max_ser *ser)
 
 	return 0;
 }
-EXPORT_SYMBOL_NS_GPL(max_ser_remove, "MAX_SERDES");
+EXPORT_SYMBOL_NS_GPL(max_ser_remove, MAX_SERDES);
 
 int max_ser_set_double_bpps(struct v4l2_subdev *sd, u32 double_bpps)
 {
@@ -2100,6 +2113,7 @@ int max_ser_wait(struct i2c_adapter *adapter, u8 addr)
 
 int max_ser_fix_tx_ids(struct i2c_adapter *adapter, u8 addr)
 {
+	printk("NKW %s %d: Fixing TX IDs for address 0x%02x\n", __func__, __LINE__, addr);
 	unsigned int addr_regs[] = {
 		MAX_SER_CFGI_INFOFR_TR3,
 		MAX_SER_CFGL_SPI_TR3,
@@ -2116,7 +2130,7 @@ int max_ser_fix_tx_ids(struct i2c_adapter *adapter, u8 addr)
 		if (ret)
 			return ret;
 	}
-
+	printk("NKW %s %d: Fixed TX IDs for address 0x%02x\n", __func__, __LINE__, addr);
 	return 0;
 }
 
@@ -2128,4 +2142,4 @@ int max_ser_change_address(struct i2c_adapter *adapter, u8 addr, u8 new_addr)
 }
 
 MODULE_LICENSE("GPL");
-MODULE_IMPORT_NS("I2C_ATR");
+MODULE_IMPORT_NS(I2C_ATR);

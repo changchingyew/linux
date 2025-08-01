@@ -1644,6 +1644,7 @@ static int max_des_i2c_atr_init(struct max_des_priv *priv)
 		struct max_des_link *link = &des->links[i];
 		struct i2c_atr_adap_desc desc = {
 			.chan_id = i,
+			.bus_handle = dev_fwnode(priv->dev),
 		};
 
 		if (!link->enabled)
@@ -2685,7 +2686,8 @@ static int max_des_v4l2_register(struct max_des_priv *priv)
 	v4l2_i2c_subdev_init(sd, priv->client, &max_des_subdev_ops);
 	i2c_set_clientdata(priv->client, data);
 	sd->internal_ops = &max_des_internal_ops;
-	sd->entity.function = MEDIA_ENT_F_VID_IF_BRIDGE;
+	//sd->entity.function = MEDIA_ENT_F_VID_IF_BRIDGE;
+	sd->entity.function = MEDIA_ENT_F_VID_MUX;
 	sd->entity.ops = &max_des_media_ops;
 	sd->flags |= V4L2_SUBDEV_FL_HAS_DEVNODE | V4L2_SUBDEV_FL_STREAMS;
 
@@ -2695,8 +2697,8 @@ static int max_des_v4l2_register(struct max_des_priv *priv)
 		else if (max_des_pad_is_source(des, i))
 			priv->pads[i].flags = MEDIA_PAD_FL_SOURCE;
 		else if (max_des_pad_is_tpg(des, i))
-			priv->pads[i].flags = MEDIA_PAD_FL_SINK |
-					      MEDIA_PAD_FL_INTERNAL;
+			priv->pads[i].flags = MEDIA_PAD_FL_SINK;// |
+					      //MEDIA_PAD_FL_INTERNAL;
 		else
 			return -EINVAL;
 	}
@@ -2920,7 +2922,7 @@ int max_des_phy_hw_data_lanes(struct max_des *des, struct max_des_phy *phy)
 
 	return config->lanes[phy->index];
 }
-EXPORT_SYMBOL_NS_GPL(max_des_phy_hw_data_lanes, "MAX_SERDES");
+EXPORT_SYMBOL_NS_GPL(max_des_phy_hw_data_lanes, MAX_SERDES);
 
 static int max_des_find_phys_config(struct max_des_priv *priv)
 {
@@ -3161,7 +3163,7 @@ err_disable_pocs:
 
 	return ret;
 }
-EXPORT_SYMBOL_NS_GPL(max_des_probe, "MAX_SERDES");
+EXPORT_SYMBOL_NS_GPL(max_des_probe, MAX_SERDES);
 
 int max_des_remove(struct max_des *des)
 {
@@ -3175,7 +3177,7 @@ int max_des_remove(struct max_des *des)
 
 	return 0;
 }
-EXPORT_SYMBOL_NS_GPL(max_des_remove, "MAX_SERDES");
+EXPORT_SYMBOL_NS_GPL(max_des_remove, MAX_SERDES);
 
 MODULE_LICENSE("GPL");
-MODULE_IMPORT_NS("I2C_ATR");
+MODULE_IMPORT_NS(I2C_ATR);
