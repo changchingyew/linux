@@ -71,7 +71,7 @@ struct isx031_mode {
 };
 
 struct isx031_hwcfg {
-	unsigned char num_data_lanes;
+	unsigned long link_freq_bitmap;
 };
 
 struct isx031 {
@@ -102,6 +102,13 @@ static const struct isx031_reg isx031_init_reg[] = {
 	{ISX031_REG_LEN_08BIT, 0xFFFF, 0x00}, // select mode
 	{ISX031_REG_LEN_08BIT, 0x0171, 0x00}, // close F_EBD
 	{ISX031_REG_LEN_08BIT, 0x0172, 0x00}, // close R_EBD
+	/* External sync */
+	{ISX031_REG_LEN_08BIT, 0xBF14, 0x01}, /* SG_MODE_APL */
+	{ISX031_REG_LEN_08BIT, 0x8AFF, 0x0c}, /*  Hi-Z (input setting or output disabled) */
+	{ISX031_REG_LEN_08BIT, 0x0153, 0x00},
+	{ISX031_REG_LEN_08BIT, 0x8AF0, 0x01}, /* external pulse-based sync */
+	{ISX031_REG_LEN_08BIT, 0x0144, 0x00},
+	{ISX031_REG_LEN_08BIT, 0x8AF1, 0x00},
 };
 
 static const struct isx031_reg isx031_framesync_reg[] = {
@@ -389,6 +396,7 @@ static int isx031_identify_module(struct isx031 *isx031)
 	if (ret)
 		return ret;
 
+	pr_err("sensor in mode 0x%x", val);
 	dev_dbg(&client->dev, "sensor in mode 0x%x", val);
 
 	/* if sensor alreay in ISX031_STATE_STARTUP, can access i2c write directly*/
@@ -397,18 +405,7 @@ static int isx031_identify_module(struct isx031 *isx031)
 			return ret;
 	}
 
-	ret = isx031_write_reg_list(isx031, &isx031_init_reg_list);
-	if (ret)
-		return ret;
-	if (isx031->platform_data != NULL) {
-		ret = isx031_write_reg_list(isx031, &isx031_framesync_reg_list);
-		if (ret) {
-			dev_err(&client->dev, "failed in set framesync.");
-			return ret;
-		}
-	}
-
-	return 0;
+	return isx031_write_reg_list(isx031, &isx031_init_reg_list);
 }
 
 static void isx031_update_pad_format(const struct isx031_mode *mode,
@@ -426,7 +423,6 @@ static int isx031_start_streaming(struct isx031 *isx031)
 	struct i2c_client *client = isx031->client;
 	const struct isx031_reg_list *reg_list;
 
-	dev_dbg(&client->dev, "%s: start streaming", __func__);
 	if (isx031->cur_mode != isx031->pre_mode) {
 		reg_list = &isx031->cur_mode->reg_list;
 		ret = isx031_write_reg_list(isx031, reg_list);
@@ -461,8 +457,6 @@ static int isx031_set_stream(struct v4l2_subdev *sd, int enable)
 	struct i2c_client *client = isx031->client;
 	int ret = 0;
 
-	dev_dbg(&client->dev, "%s: %s streaming", __func__,
-		enable ? "start" : "stop");
 	if (isx031->streaming == enable)
 		return 0;
 
@@ -491,6 +485,20 @@ static int isx031_set_stream(struct v4l2_subdev *sd, int enable)
 	mutex_unlock(&isx031->mutex);
 
 	return ret;
+}
+
+static int isx031_enable_streams(struct v4l2_subdev *subdev,
+	struct v4l2_subdev_state *state,
+	u32 pad, u64 streams_mask)
+{
+	return isx031_set_stream(subdev, true);
+}
+
+static int isx031_disable_streams(struct v4l2_subdev *subdev,
+	 struct v4l2_subdev_state *state,
+	 u32 pad, u64 streams_mask)
+{
+	return isx031_set_stream(subdev, false);
 }
 
 static int __maybe_unused isx031_suspend(struct device *dev)
@@ -653,6 +661,14 @@ static int isx031_set_format(struct v4l2_subdev *sd,
 		isx031->cur_mode = mode;
 	}
 
+	if (isx031->cur_mode != isx031->pre_mode) {
+		ret = isx031_write_reg_list(isx031, &isx031->cur_mode->reg_list);
+		if (ret)
+			dev_err(&isx031->client->dev, "failed to set stream mode");
+		else
+			isx031->pre_mode = isx031->cur_mode;
+	}
+
 	mutex_unlock(&isx031->mutex);
 
 	return 0;
@@ -716,6 +732,8 @@ static const struct v4l2_subdev_pad_ops isx031_pad_ops = {
 	.set_fmt = isx031_set_format,
 	.get_fmt = isx031_get_format,
 	.get_frame_desc = isx031_get_frame_desc,
+	.enable_streams = isx031_enable_streams,
+	.disable_streams = isx031_disable_streams,
 };
 
 static const struct v4l2_subdev_ops isx031_subdev_ops = {
@@ -762,8 +780,15 @@ static struct isx031_hwcfg *isx031_get_hwcfg(struct isx031 *isx031, struct devic
 	if (bus_cfg.bus.mipi_csi2.num_data_lanes != 2 ) {
 		dev_err(dev, "only 2 data lanes are currently supported");
 		goto out_err;
-	} else
-		cfg->num_data_lanes = bus_cfg.bus.mipi_csi2.num_data_lanes;
+	}
+
+	// ret = v4l2_link_freq_to_bitmap(dev, bus_cfg.link_frequencies,
+	// 			       bus_cfg.nr_of_link_frequencies,
+	// 			       link_freq_menu_items,
+	// 			       ARRAY_SIZE(link_freq_menu_items),
+	// 			       &isx031->link_freq_bitmap);
+	// if (ret)
+	// 	goto out_err;
 
 	v4l2_fwnode_endpoint_free(&bus_cfg);
 	fwnode_handle_put(endpoint);
