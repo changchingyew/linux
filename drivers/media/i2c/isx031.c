@@ -71,7 +71,7 @@ struct isx031_mode {
 };
 
 struct isx031_hwcfg {
-	unsigned long link_freq_bitmap;
+	unsigned char num_data_lanes;
 };
 
 struct isx031 {
@@ -779,15 +779,8 @@ static struct isx031_hwcfg *isx031_get_hwcfg(struct isx031 *isx031, struct devic
 	if (bus_cfg.bus.mipi_csi2.num_data_lanes != 2 ) {
 		dev_err(dev, "only 2 data lanes are currently supported");
 		goto out_err;
-	}
-
-	// ret = v4l2_link_freq_to_bitmap(dev, bus_cfg.link_frequencies,
-	// 			       bus_cfg.nr_of_link_frequencies,
-	// 			       link_freq_menu_items,
-	// 			       ARRAY_SIZE(link_freq_menu_items),
-	// 			       &isx031->link_freq_bitmap);
-	// if (ret)
-	// 	goto out_err;
+	} else
+		cfg->num_data_lanes = bus_cfg.bus.mipi_csi2.num_data_lanes;
 
 	v4l2_fwnode_endpoint_free(&bus_cfg);
 	fwnode_handle_put(endpoint);
