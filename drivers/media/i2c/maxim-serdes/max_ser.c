@@ -431,16 +431,22 @@ static int max_ser_i2c_adapter_init(struct max_ser_priv *priv)
 	else
 		return max_ser_i2c_atr_init(priv);
 #else
-	return max_ser_i2c_atr_init(priv);
+	//return max_ser_i2c_atr_init(priv);
+	return max_ser_i2c_mux_init(priv);
 #endif
 }
 
 static void max_ser_i2c_adapter_deinit(struct max_ser_priv *priv)
 {
+#if 0
 	if (device_get_named_child_node(priv->dev, "i2c-gate"))
 		max_ser_i2c_mux_deinit(priv);
 	else
 		max_ser_i2c_atr_deinit(priv);
+#else
+	//max_ser_i2c_atr_deinit(priv);
+	max_ser_i2c_mux_deinit(priv);
+#endif
 }
 
 static int max_ser_set_tpg_fmt(struct v4l2_subdev *sd,

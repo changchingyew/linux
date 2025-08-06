@@ -1384,6 +1384,8 @@ static int max_des_init_link_ser_xlate(struct max_des_priv *priv,
 	u8 current_addr;
 	int ret;
 
+	printk("NKW adapter %p, power_up_addr 0x%02x, new_addr 0x%02x\n",
+	       adapter, power_up_addr, new_addr);
 	ret = des->ops->select_links(des, BIT(link->index));
 	if (ret)
 		return ret;
@@ -1549,7 +1551,7 @@ static int max_des_ser_attach_addr(struct max_des_priv *priv, u32 chan_id,
 	struct max_des_link *link = &des->links[chan_id];
 	int i, min, max;
 	int ret = 0;
-
+printk("NKW %s\n", __func__);
 	max_des_ser_find_version_range(des, &min, &max);
 
 	if (link->ser_xlate.en) {
@@ -1627,7 +1629,7 @@ static int max_des_i2c_atr_init(struct max_des_priv *priv)
 	unsigned int mask = 0;
 	unsigned int i;
 	int ret;
-
+printk("NKW %s\n", __func__);
 	if (!i2c_check_functionality(priv->client->adapter,
 				     I2C_FUNC_SMBUS_WRITE_BYTE_DATA))
 		return -ENODEV;
@@ -1728,7 +1730,7 @@ static int max_des_i2c_mux_init(struct max_des_priv *priv)
 	u32 flags = I2C_MUX_LOCKED;
 	unsigned int i;
 	int ret;
-
+printk("NKW %s\n", __func__);
 	if (des->ops->num_links == 1)
 		flags |= I2C_MUX_GATE;
 

@@ -329,6 +329,12 @@ static void i2c_acpi_register_device(struct i2c_adapter *adapter,
 			if (atr_channel != acpi_channel) {
 				printk(KERN_ERR "ATR channel %d does not match channel %d in %s\n", atr_channel, acpi_channel, fwnode_get_name(&adev->fwnode));
 				return;
+			} else
+ 				printk(KERN_ERR "NKW %s: ATR channel %d matches channel %d in %s\n",__func__, atr_channel, acpi_channel, fwnode_get_name(&adev->fwnode));
+
+			if (adev->dep_unmet) {
+				printk("NKW %s: adev->dep_unmet = %d\n", __func__, adev->dep_unmet);
+				return;
 			}
 		} else {
 			printk(KERN_ERR "channel property not present for %s\n", fwnode_get_name(&adev->fwnode));
