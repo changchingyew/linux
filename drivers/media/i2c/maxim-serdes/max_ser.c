@@ -425,10 +425,14 @@ static int max_ser_i2c_mux_init(struct max_ser_priv *priv)
 
 static int max_ser_i2c_adapter_init(struct max_ser_priv *priv)
 {
+#if 0
 	if (device_get_named_child_node(priv->dev, "i2c-gate"))
 		return max_ser_i2c_mux_init(priv);
 	else
 		return max_ser_i2c_atr_init(priv);
+#else
+	return max_ser_i2c_atr_init(priv);
+#endif
 }
 
 static void max_ser_i2c_adapter_deinit(struct max_ser_priv *priv)
@@ -1239,6 +1243,7 @@ static int max_ser_update_streams(struct v4l2_subdev *sd,
 	ret = max_serdes_get_streams_masks(priv->dev, state, pad, updated_streams_mask,
 					   num_pads, priv->streams_masks, &streams_masks,
 					   enable);
+
 	if (ret)
 		return ret;
 
@@ -1304,7 +1309,6 @@ static int max_ser_disable_streams(struct v4l2_subdev *sd,
 static int max_ser_init_state(struct v4l2_subdev *sd,
 			      struct v4l2_subdev_state *state)
 {
-	printk("NKW %s\n", __func__);
 	struct v4l2_subdev_route routes[MAX_SER_NUM_PHYS] = { 0 };
 	struct v4l2_subdev_krouting routing = {
 		.routes = routes,
@@ -1316,11 +1320,9 @@ static int max_ser_init_state(struct v4l2_subdev *sd,
 
 	for (i = 0; i < ser->ops->num_phys; i++) {
 		struct max_ser_phy *phy = &ser->phys[i];
-		printk("NKW %s %d\n", __func__, __LINE__);
 
 		if (!phy->enabled)
 			continue;
-		printk("NKW %s %d\n", __func__, __LINE__);
 
 		routing.routes[routing.num_routes++] = (struct v4l2_subdev_route) {
 			.sink_pad = max_ser_phy_to_pad(ser, phy),
@@ -1339,7 +1341,6 @@ static int max_ser_init_state(struct v4l2_subdev *sd,
 		 */
 		break;
 	}
-		printk("NKW %s %d\n", __func__, __LINE__);
 
 	return __max_ser_set_routing(sd, state, &routing);
 }
@@ -1600,8 +1601,8 @@ static int max_ser_v4l2_register(struct max_ser_priv *priv)
 	v4l2_i2c_subdev_init(sd, priv->client, &max_ser_subdev_ops);
 	i2c_set_clientdata(priv->client, data);
 	sd->internal_ops = &max_ser_internal_ops;
-	//sd->entity.function = MEDIA_ENT_F_VID_IF_BRIDGE;
-	sd->entity.function = MEDIA_ENT_F_VID_MUX;
+	sd->entity.function = MEDIA_ENT_F_VID_IF_BRIDGE;
+	//sd->entity.function = MEDIA_ENT_F_VID_MUX;
 	sd->entity.ops = &max_ser_media_ops;
 	sd->flags |= V4L2_SUBDEV_FL_HAS_DEVNODE | V4L2_SUBDEV_FL_STREAMS;
 
@@ -1647,15 +1648,15 @@ static int max_ser_v4l2_register(struct max_ser_priv *priv)
 	ret = max_ser_v4l2_notifier_register(priv);
 	if (ret)
 		goto err_media_entity_cleanup;
-printk("NKW %s %d\n", __func__, __LINE__);
+
 	ret = v4l2_subdev_init_finalize(sd);
 	if (ret)
 		goto err_nf_cleanup;
-printk("NKW %s %d\n", __func__, __LINE__);
+
 	ret = v4l2_async_register_subdev(sd);
 	if (ret)
 		goto err_sd_cleanup;
-printk("NKW %s %d\n", __func__, __LINE__);
+
 
 	if (!sd->flags & V4L2_SUBDEV_FL_HAS_DEVNODE) {
 		dev_err(priv->dev, "Subdev %s does not have a devnode\n",sd->name);
@@ -1875,7 +1876,7 @@ int max_ser_probe(struct i2c_client *client, struct max_ser *ser)
 	ret = max_ser_v4l2_register(priv);
 	if (ret)
 		goto err_i2c_adapter_deinit;
-printk("NKW %s %d\n", __func__, __LINE__);
+
 	return 0;
 
 err_i2c_adapter_deinit:

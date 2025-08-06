@@ -199,6 +199,7 @@ int max_serdes_xlate_enable_disable_streams(struct max_serdes_source *sources,
 		updated_sink_streams_mask =
 			v4l2_subdev_state_xlate_streams(state, pad, i,
 							&matched_streams_mask);
+
 		if (!updated_sink_streams_mask)
 			continue;
 

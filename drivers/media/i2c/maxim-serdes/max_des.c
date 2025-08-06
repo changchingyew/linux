@@ -2122,6 +2122,7 @@ static int max_des_get_mbus_config(struct v4l2_subdev *sd, unsigned int pad,
 	cfg->type = phy->bus_type;
 	cfg->bus.mipi_csi2 = phy->mipi;
 	cfg->link_freq = phy->link_frequency;
+	printk("NKW %s cfg->link_freq = %llu\n", __func__, cfg->link_freq);
 
 	return 0;
 }
@@ -2686,8 +2687,8 @@ static int max_des_v4l2_register(struct max_des_priv *priv)
 	v4l2_i2c_subdev_init(sd, priv->client, &max_des_subdev_ops);
 	i2c_set_clientdata(priv->client, data);
 	sd->internal_ops = &max_des_internal_ops;
-	//sd->entity.function = MEDIA_ENT_F_VID_IF_BRIDGE;
-	sd->entity.function = MEDIA_ENT_F_VID_MUX;
+	sd->entity.function = MEDIA_ENT_F_VID_IF_BRIDGE;
+	//sd->entity.function = MEDIA_ENT_F_VID_MUX;
 	sd->entity.ops = &max_des_media_ops;
 	sd->flags |= V4L2_SUBDEV_FL_HAS_DEVNODE | V4L2_SUBDEV_FL_STREAMS;
 
@@ -2721,6 +2722,7 @@ static int max_des_v4l2_register(struct max_des_priv *priv)
 			goto err_free_ctrl;
 		}
 	}
+	
 
 	ret = media_entity_pads_init(&sd->entity, num_pads, priv->pads);
 	if (ret)
@@ -2911,6 +2913,7 @@ static int max_des_parse_src_dt_endpoint(struct max_des_priv *priv,
 	phy->link_frequency = link_frequency;
 	phy->enabled = true;
 
+	printk("NKW phy %d, DES LINK FREQ = %llu\n", phy->index, link_frequency);
 	return 0;
 }
 

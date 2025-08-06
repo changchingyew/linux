@@ -845,6 +845,7 @@ void ipu6_isys_configure_stream_watermark(struct ipu6_isys_video *av,
 
 	csi2 = ipu6_isys_subdev_to_csi2(av->stream->asd);
 	link_freq = ipu6_isys_csi2_get_link_freq(csi2);
+	printk("NKW %s link_freq %llu", __func__, link_freq);
 	if (link_freq > 0) {
 		lanes = csi2->nlanes;
 		ret = ipu6_isys_get_stream_pad_fmt(&csi2->asd.sd, 0,

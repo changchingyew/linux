@@ -489,8 +489,10 @@ s64 __v4l2_get_link_freq_ctrl(struct v4l2_ctrl_handler *handler,
 			return -ENOENT;
 
 		ctrl = v4l2_ctrl_find(handler, V4L2_CID_PIXEL_RATE);
-		if (!ctrl)
+		if (!ctrl) {
+			printk("NKW %s: No pixel rate control found\n", __func__);
 			return -ENOENT;
+		}
 
 		freq = div_u64(v4l2_ctrl_g_ctrl_int64(ctrl) * mul, div);
 
@@ -500,6 +502,7 @@ s64 __v4l2_get_link_freq_ctrl(struct v4l2_ctrl_handler *handler,
 			__func__);
 	}
 
+	printk("NKW %s: Link frequency: %lld Hz (mul=%u, div=%u)\n", __func__, freq, mul, div);
 	return freq > 0 ? freq : -EINVAL;
 }
 EXPORT_SYMBOL_GPL(__v4l2_get_link_freq_ctrl);

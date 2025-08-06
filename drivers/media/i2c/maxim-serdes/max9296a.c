@@ -1095,7 +1095,7 @@ static int max9296a_probe(struct i2c_client *client)
 	priv->regmap = devm_regmap_init_i2c(client, &i2c_regmap);
 	if (IS_ERR(priv->regmap))
 		return PTR_ERR(priv->regmap);
-
+#if 0
 	priv->gpiod_pwdn = devm_gpiod_get_optional(&client->dev, "powerdown",
 						   GPIOD_OUT_HIGH);
 	if (IS_ERR(priv->gpiod_pwdn))
@@ -1109,7 +1109,7 @@ static int max9296a_probe(struct i2c_client *client)
 		/* Maximum power-up time (tLOCK) 4ms */
 		usleep_range(4000, 5000);
 	}
-
+#endif
 	*ops = max9296a_common_ops;
 
 	ops->versions = priv->info->ops->versions;
