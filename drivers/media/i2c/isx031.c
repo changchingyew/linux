@@ -328,6 +328,28 @@ static int isx031_write_reg_list(struct isx031 *isx031,
 	return 0;
 }
 
+static int isx031_state_query(struct isx031 *isx031)
+{
+	struct i2c_client *client = isx031->client;
+	int ret;
+	u32 val;
+	int i;
+#define QUERY_RETRY 50
+
+	for (i = 0; i < QUERY_RETRY; i++) {
+		ret = isx031_read_reg(isx031, ISX031_REG_SENSOR_STATE,
+			      ISX031_REG_LEN_08BIT, &val);
+		if (ret == 0)
+			break;
+		usleep_range(10000, 10500);
+	}
+
+	if (i == QUERY_RETRY)
+		return -ETIMEDOUT;
+	else
+		return val;
+}
+
 static int isx031_mode_transit(struct isx031 *isx031, int state)
 {
 	struct i2c_client *client = isx031->client;
@@ -459,7 +481,9 @@ static int isx031_set_stream(struct v4l2_subdev *sd, int enable)
 	if (isx031->streaming == enable)
 		return 0;
 
+	dev_dbg(&client->dev, "isx031 pre-state: %d\n", isx031_state_query(isx031));
 	mutex_lock(&isx031->mutex);
+
 	if (enable) {
 		ret = pm_runtime_get_sync(&client->dev);
 		if (ret < 0) {
@@ -482,6 +506,7 @@ static int isx031_set_stream(struct v4l2_subdev *sd, int enable)
 	isx031->streaming = enable;
 
 	mutex_unlock(&isx031->mutex);
+	dev_dbg(&client->dev, "isx031 post-state: %d\n", isx031_state_query(isx031));
 
 	return ret;
 }
@@ -873,6 +898,7 @@ static int isx031_probe(struct i2c_client *client)
 		dev_err(&client->dev, "failed to find sensor: %d", ret);
 		return ret;
 	}
+	dev_dbg(&client->dev, "isx031 state: %d\n", isx031_state_query(isx031));
 
 	if (isx031->platform_data->suffix)
 		snprintf(isx031->sd.name, sizeof(isx031->sd.name), "isx031 %c",

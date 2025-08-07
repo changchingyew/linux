@@ -207,10 +207,21 @@ int max_serdes_xlate_enable_disable_streams(struct max_serdes_source *sources,
 		if (!source)
 			continue;
 
-		if (enable)
-			ret = v4l2_subdev_enable_streams(source->sd, source->pad,
-							 updated_sink_streams_mask);
-		else
+		if (enable) {
+			dev_dbg(source->sd->dev,
+			       "Enabling streams for source %s, pad %u, mask 0x%llx\n",
+			       source->sd->name, source->pad,
+			       updated_sink_streams_mask);
+			// if(strncmp(source->sd->name, "isx031", 6)) {
+				// enable streams for non-isx031 sources
+				// dev_dbg(source->sd->dev, "Enabling streams for source %s\n",
+				//        source->sd->name);
+				ret = v4l2_subdev_enable_streams(source->sd, source->pad,
+								updated_sink_streams_mask);
+			// } else {
+			// 	ret = 0;
+			// }
+		} else
 			ret = v4l2_subdev_disable_streams(source->sd, source->pad,
 							  updated_sink_streams_mask);
 		if (ret) {

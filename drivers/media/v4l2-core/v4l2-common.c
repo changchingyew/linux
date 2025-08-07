@@ -515,6 +515,7 @@ s64 __v4l2_get_link_freq_pad(struct media_pad *pad, unsigned int mul,
 	struct v4l2_subdev *sd;
 	int ret;
 
+	pr_err("%s: pad %d\n", __func__, pad->index);
 	sd = media_entity_to_v4l2_subdev(pad->entity);
 	ret = v4l2_subdev_call(sd, pad, get_mbus_config, pad->index,
 			       &mbus_config);

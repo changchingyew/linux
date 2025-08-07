@@ -452,6 +452,7 @@ static void init_csi2_port_local(struct acpi_device *adev,
 	acpi_handle handle = acpi_device_handle(adev);
 	unsigned int num_link_freqs;
 	int ret;
+	int i;
 
 	ret = fwnode_property_count_u64(port_fwnode, "mipi-img-link-frequencies");
 	if (ret <= 0)
@@ -473,6 +474,10 @@ static void init_csi2_port_local(struct acpi_device *adev,
 				 ret);
 		return;
 	}
+
+	for (i = 0; i < num_link_freqs; i++)
+		acpi_handle_debug(handle, "mipi-img-link-frequencies %d: %llu\n",
+				  i, port->link_frequencies[i]);
 
 	port->ep_props[NEXT_PROPERTY(index, EP_LINK_FREQUENCIES)] =
 				PROPERTY_ENTRY_U64_ARRAY_LEN("link-frequencies",

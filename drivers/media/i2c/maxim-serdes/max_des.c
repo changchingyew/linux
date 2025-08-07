@@ -1390,6 +1390,8 @@ static int max_des_init_link_ser_xlate(struct max_des_priv *priv,
 	if (ret)
 		return ret;
 
+	pr_err("max_des_init_link_ser_xlate: link %u, phy 0x%02x, alias 0x%02x\n",
+	       link->index, power_up_addr, new_addr);
 	ret = max_ser_wait_for_multiple(adapter, addrs, ARRAY_SIZE(addrs),
 					&current_addr);
 	if (ret) {
@@ -1435,6 +1437,7 @@ static int max_des_init_link_ser_xlate(struct max_des_priv *priv,
 			return ret;
 	}
 
+	pr_err("max_des_init_link_ser_xlate complete\n");
 	return ret;
 }
 
@@ -1551,8 +1554,9 @@ static int max_des_ser_attach_addr(struct max_des_priv *priv, u32 chan_id,
 	struct max_des_link *link = &des->links[chan_id];
 	int i, min, max;
 	int ret = 0;
-printk("NKW %s\n", __func__);
-	max_des_ser_find_version_range(des, &min, &max);
+	pr_err("des_ser_atr_attach_addr: chan_id %u, addr 0x%04x, alias 0x%04x\n",
+	       chan_id, addr, alias);
+		max_des_ser_find_version_range(des, &min, &max);
 
 	if (link->ser_xlate.en) {
 		dev_err(priv->dev, "Serializer for link %u already bound\n",
@@ -2117,6 +2121,7 @@ static int max_des_get_mbus_config(struct v4l2_subdev *sd, unsigned int pad,
 	struct max_des *des = priv->des;
 	struct max_des_phy *phy;
 
+	dev_dbg(priv->dev, "max_des_get_mbus_config: pad %u\n", pad);
 	phy = max_des_pad_to_phy(des, pad);
 	if (!phy)
 		return -EINVAL;
@@ -2124,7 +2129,8 @@ static int max_des_get_mbus_config(struct v4l2_subdev *sd, unsigned int pad,
 	cfg->type = phy->bus_type;
 	cfg->bus.mipi_csi2 = phy->mipi;
 	cfg->link_freq = phy->link_frequency;
-	printk("NKW %s cfg->link_freq = %llu\n", __func__, cfg->link_freq);
+	dev_dbg(priv->dev, "max_des_get_mbus_config: type %u, link_freq %llu\n",
+	       cfg->type, cfg->link_freq);
 
 	return 0;
 }
@@ -2440,6 +2446,8 @@ static int max_des_enable_streams(struct v4l2_subdev *sd,
 				  struct v4l2_subdev_state *state,
 				  u32 pad, u64 streams_mask)
 {
+	pr_err("%s: pad %u, streams_mask 0x%llx\n",
+	       __func__, pad, streams_mask);
 	return max_des_update_streams(sd, state, pad, streams_mask, true);
 }
 
@@ -2880,11 +2888,15 @@ static int max_des_parse_src_dt_endpoint(struct max_des_priv *priv,
 		return -EINVAL;
 	}
 
-	if (v4l2_ep.nr_of_link_frequencies == 0)
+	if (v4l2_ep.nr_of_link_frequencies == 0) {
 		link_frequency = MAX_DES_LINK_FREQUENCY_DEFAULT;
-	else if (v4l2_ep.nr_of_link_frequencies == 1)
+		dev_dbg(priv->dev, "No link frequencies provided on port %u\n",
+			pad);
+	} else if (v4l2_ep.nr_of_link_frequencies == 1) {
 		link_frequency = v4l2_ep.link_frequencies[0];
-	else
+		dev_dbg(priv->dev, "link_frequency provided %llu\n",
+			link_frequency);
+	} else
 		ret = -EINVAL;
 
 	v4l2_fwnode_endpoint_free(&v4l2_ep);
@@ -2893,6 +2905,13 @@ static int max_des_parse_src_dt_endpoint(struct max_des_priv *priv,
 		dev_err(priv->dev, "Invalid link frequencies %u on port %u\n",
 			v4l2_ep.nr_of_link_frequencies, pad);
 		return -EINVAL;
+	} else {
+		// dev_dbg(priv->dev, "nr of link frequency %u on port %u\n",
+		// 	v4l2_ep.nr_of_link_frequencies, pad);
+		// for(i = 0; i < v4l2_ep.nr_of_link_frequencies; i++) {
+		// 	dev_dbg(priv->dev, "Link frequency %d:%llu on port %u\n",
+		// 		i, v4l2_ep.link_frequencies[i], pad);
+		// }
 	}
 
 	if (link_frequency < MAX_DES_LINK_FREQUENCY_MIN ||
@@ -2910,6 +2929,7 @@ static int max_des_parse_src_dt_endpoint(struct max_des_priv *priv,
 		}
 	}
 
+	dev_dbg(priv->dev, "max_des_parse_src_dt_endpoint 4\n");
 	phy->bus_type = bus_type;
 	phy->mipi = *mipi;
 	phy->link_frequency = link_frequency;
@@ -3101,6 +3121,8 @@ int max_des_probe(struct i2c_client *client, struct max_des *des)
 	struct max_des_priv *priv;
 	int ret;
 
+	dev_info(dev, "probe adaptor %x addr %x\n", client->adapter->nr,
+	       client->addr);
 	if (des->ops->num_phys > MAX_DES_NUM_PHYS)
 		return -E2BIG;
 
@@ -3158,6 +3180,9 @@ int max_des_probe(struct i2c_client *client, struct max_des *des)
 	if (ret)
 		goto err_i2c_adapter_deinit;
 
+	dev_info(dev, "Probed with %u phys, %u pipes and %u links\n",
+		des->ops->num_phys,
+		des->ops->num_pipes, des->ops->num_links);
 	return 0;
 
 err_i2c_adapter_deinit:

@@ -1130,6 +1130,7 @@ static int max96717_set_i2c_xlate(struct max_ser *ser, unsigned int i,
 	struct max96717_priv *priv = ser_to_priv(ser);
 	int ret;
 
+	pr_err("%s: i2c_src: 0x%x, i2c_dst: 0x%x\n", __func__, xlate->src, xlate->dst);
 	ret = regmap_update_bits(priv->regmap, MAX96717_I2C_2(i),
 				 MAX96717_I2C_2_SRC,
 				 FIELD_PREP(MAX96717_I2C_2_SRC, xlate->src));

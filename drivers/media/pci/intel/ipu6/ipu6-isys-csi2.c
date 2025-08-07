@@ -82,6 +82,7 @@ s64 ipu6_isys_csi2_get_link_freq(struct ipu6_isys_csi2 *csi2)
 	struct media_pad *src_pad;
 	struct v4l2_subdev *ext_sd;
 	struct device *dev;
+	s64 link_freq;
 
 	if (!csi2)
 		return -EINVAL;
@@ -95,6 +96,7 @@ s64 ipu6_isys_csi2_get_link_freq(struct ipu6_isys_csi2 *csi2)
 	}
 
 	ext_sd = media_entity_to_v4l2_subdev(src_pad->entity);
+	dev_dbg(dev, "port subdev %s: \n", ext_sd->name);
 	if (WARN(!ext_sd, "Failed to get subdev for %s\n", csi2->asd.sd.name))
 		return -ENODEV;
 
@@ -200,6 +202,8 @@ ipu6_isys_csi2_calc_timing(struct ipu6_isys_csi2 *csi2,
 	s64 link_freq;
 
 	link_freq = ipu6_isys_csi2_get_link_freq(csi2);
+	dev_dbg(dev, "csi2-%u link frequency %lld Hz\n",
+		csi2->port, link_freq);
 	if (link_freq < 0)
 		return link_freq;
 
@@ -383,6 +387,9 @@ static int ipu6_isys_csi2_enable_streams(struct v4l2_subdev *sd,
 	u64 sink_streams;
 	int ret;
 
+	dev_dbg(&csi2->isys->adev->auxdev.dev,
+	     "enable streams for %s pad %u mask 0x%llx\n", sd->name, pad,
+	     streams_mask);
 	remote_pad = media_pad_remote_pad_first(&sd->entity.pads[CSI2_PAD_SINK]);
 	remote_sd = media_entity_to_v4l2_subdev(remote_pad->entity);
 
@@ -391,16 +398,24 @@ static int ipu6_isys_csi2_enable_streams(struct v4l2_subdev *sd,
 						       &streams_mask);
 
 	ret = ipu6_isys_csi2_calc_timing(csi2, &timing, CSI2_ACCINV);
-	if (ret)
+	if (ret) {
+		dev_dbg(&csi2->isys->adev->auxdev.dev,
+		     "Failed to calculate CSI2-%u timing: %d\n", csi2->port, ret);
 		return ret;
+	}
 
 	ret = ipu6_isys_csi2_set_stream(sd, &timing, csi2->nlanes, true);
-	if (ret)
+	if (ret) {
+		dev_dbg(&csi2->isys->adev->auxdev.dev,
+		     "Failed to enable CSI2-%u stream: %d\n", csi2->port, ret);
 		return ret;
+	}
 
 	ret = v4l2_subdev_enable_streams(remote_sd, remote_pad->index,
 					 sink_streams);
 	if (ret) {
+		dev_dbg(&csi2->isys->adev->auxdev.dev,
+		     "Failed to enable remote streams: %d\n", ret);
 		ipu6_isys_csi2_set_stream(sd, NULL, 0, false);
 		return ret;
 	}

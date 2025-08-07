@@ -332,6 +332,8 @@ static int max_ser_i2c_atr_attach_addr(struct i2c_atr *atr, u32 chan_id,
 	unsigned int i;
 	int ret;
 
+	pr_err("ser_i2c_atr_attach_addr: chan_id %u, addr 0x%04x, alias 0x%04x\n",
+	       chan_id, addr, alias);
 	for (i = 0; i < ser->ops->num_i2c_xlates; i++)
 		if (!ser->i2c_xlates[i].en)
 			break;
@@ -386,6 +388,7 @@ static int max_ser_i2c_atr_init(struct max_ser_priv *priv)
 {
 	struct i2c_atr_adap_desc desc = {
 		.chan_id = 0,
+		.bus_handle = dev_fwnode(priv->dev)
 	};
 
 	if (!i2c_check_functionality(priv->client->adapter,
@@ -1246,6 +1249,8 @@ static int max_ser_update_streams(struct v4l2_subdev *sd,
 	u64 *streams_masks;
 	int ret;
 
+	dev_dbg(priv->dev, "max_ser_update_streams 1: pad %u, streams_mask 0x%llx, enable %d\n",
+		pad, updated_streams_mask, enable);
 	ret = max_serdes_get_streams_masks(priv->dev, state, pad, updated_streams_mask,
 					   num_pads, priv->streams_masks, &streams_masks,
 					   enable);
@@ -1254,12 +1259,16 @@ static int max_ser_update_streams(struct v4l2_subdev *sd,
 		return ret;
 
 	if (!enable) {
+		dev_dbg(priv->dev, "max_ser_update_streams 2: pad %u, streams_mask 0x%llx, enable %d\n",
+			pad, updated_streams_mask, enable);
 		ret = max_ser_enable_disable_streams(priv, state, pad,
 						     updated_streams_mask, enable);
 		if (ret)
 			goto err_free_streams_masks;
 	}
 
+	dev_dbg(priv->dev, "max_ser_update_streams 3: pad %u, streams_mask 0x%llx, enable %d\n",
+		pad, updated_streams_mask, enable);
 	ret = max_ser_update_tpg(priv, state, streams_masks);
 	if (ret)
 		goto err_revert_streams_disable;
@@ -1269,6 +1278,8 @@ static int max_ser_update_streams(struct v4l2_subdev *sd,
 		goto err_revert_update_tpg;
 
 	if (enable) {
+		dev_dbg(priv->dev, "max_ser_update_streams 4: pad %u, streams_mask 0x%llx, enable %d\n",
+			pad, updated_streams_mask, enable);
 		ret = max_ser_enable_disable_streams(priv, state, pad,
 						     updated_streams_mask, enable);
 		if (ret)
@@ -1278,6 +1289,9 @@ static int max_ser_update_streams(struct v4l2_subdev *sd,
 	devm_kfree(priv->dev, priv->streams_masks);
 	priv->streams_masks = streams_masks;
 	ser->active = !!streams_masks[pad];
+
+	dev_dbg(priv->dev, "max_ser_update_streams 5: pad %u, streams_mask 0x%llx, enable %d\n",
+		pad, updated_streams_mask, enable);
 
 	return 0;
 
@@ -1302,6 +1316,8 @@ static int max_ser_enable_streams(struct v4l2_subdev *sd,
 				  struct v4l2_subdev_state *state,
 				  u32 pad, u64 streams_mask)
 {
+	pr_err("max_ser_enable_streams: pad %u, streams_mask 0x%llx\n",
+	       pad, streams_mask);
 	return max_ser_update_streams(sd, state, pad, streams_mask, true);
 }
 
@@ -1850,6 +1866,8 @@ int max_ser_probe(struct i2c_client *client, struct max_ser *ser)
 	struct max_ser_priv *priv;
 	int ret;
 
+	dev_info(dev, "probe adaptor %x addr %x\n", client->adapter->nr,
+	       client->addr);
 	if (ser->ops->num_phys > MAX_SER_NUM_PHYS)
 		return -E2BIG;
 
@@ -1883,6 +1901,8 @@ int max_ser_probe(struct i2c_client *client, struct max_ser *ser)
 	if (ret)
 		goto err_i2c_adapter_deinit;
 
+	dev_info(priv->dev, "Probed with %u phys and %u pipes\n",
+		 ser->ops->num_phys, ser->ops->num_pipes);
 	return 0;
 
 err_i2c_adapter_deinit:
