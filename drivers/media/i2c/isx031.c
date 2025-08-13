@@ -102,13 +102,6 @@ static const struct isx031_reg isx031_init_reg[] = {
 	{ISX031_REG_LEN_08BIT, 0xFFFF, 0x00}, // select mode
 	{ISX031_REG_LEN_08BIT, 0x0171, 0x00}, // close F_EBD
 	{ISX031_REG_LEN_08BIT, 0x0172, 0x00}, // close R_EBD
-	/* External sync */
-	{ISX031_REG_LEN_08BIT, 0xBF14, 0x01}, /* SG_MODE_APL */
-	{ISX031_REG_LEN_08BIT, 0x8AFF, 0x0c}, /*  Hi-Z (input setting or output disabled) */
-	{ISX031_REG_LEN_08BIT, 0x0153, 0x00},
-	{ISX031_REG_LEN_08BIT, 0x8AF0, 0x01}, /* external pulse-based sync */
-	{ISX031_REG_LEN_08BIT, 0x0144, 0x00},
-	{ISX031_REG_LEN_08BIT, 0x8AF1, 0x00},
 };
 
 static const struct isx031_reg isx031_framesync_reg[] = {
