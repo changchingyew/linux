@@ -770,8 +770,8 @@ static struct isx031_hwcfg *isx031_get_hwcfg(struct isx031 *isx031, struct devic
 		goto out_err;
 
 	/* Check the number of MIPI CSI2 data lanes */
-	if (bus_cfg.bus.mipi_csi2.num_data_lanes != 2 ) {
-		dev_err(dev, "only 2 data lanes are currently supported");
+	if (bus_cfg.bus.mipi_csi2.num_data_lanes != 4 ) {
+		dev_err(dev, "only 4 data lanes are currently supported");
 		goto out_err;
 	} else
 		cfg->num_data_lanes = bus_cfg.bus.mipi_csi2.num_data_lanes;
