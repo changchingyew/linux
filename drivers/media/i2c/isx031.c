@@ -398,7 +398,19 @@ static int isx031_identify_module(struct isx031 *isx031)
 			return ret;
 	}
 
-	return isx031_write_reg_list(isx031, &isx031_init_reg_list);
+	ret = isx031_write_reg_list(isx031, &isx031_init_reg_list);
+	if (ret) {
+		pr_err("sensor error init reg");
+		return ret;
+	}
+/*	
+        ret = isx031_write_reg_list(isx031, &isx031_framesync_reg_list);
+        if (ret) {
+                dev_err(&client->dev, "failed in set framesync.");
+                return ret;
+        }
+*/
+	return 0;
 }
 
 static void isx031_update_pad_format(const struct isx031_mode *mode,
