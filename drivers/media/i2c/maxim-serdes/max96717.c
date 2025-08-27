@@ -1573,7 +1573,11 @@ static int max96717_gpiochip_probe(struct max96717_priv *priv)
 		.direction_input = max96717_gpio_direction_input,
 		.direction_output = max96717_gpio_direction_output,
 		.get = max96717_gpio_get,
+#if 0
 		.set_rv = max96717_gpio_set,
+#else
+		.set = max96717_gpio_set,
+#endif
 	};
 
 	return devm_gpiochip_add_data(dev, &priv->gc, priv);
