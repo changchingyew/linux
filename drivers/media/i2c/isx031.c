@@ -707,7 +707,50 @@ static const struct v4l2_subdev_internal_ops isx031_internal_ops = {
 	.open = isx031_open,
 };
 
+static int isx031_parse_fwnode(struct isx031 *isx031, struct device *dev)
+{
+	struct fwnode_handle *endpoint;
+	struct v4l2_fwnode_endpoint bus_cfg = {
+		.bus_type = V4L2_MBUS_CSI2_DPHY,
+	};
+	int ret;
+
+	endpoint =
+		fwnode_graph_get_endpoint_by_id(dev_fwnode(dev), 0, 0,
+						FWNODE_GRAPH_ENDPOINT_NEXT);
+	if (!endpoint) {
+		dev_err(dev, "endpoint node not found");
+		return -EPROBE_DEFER;
+	}
+
+	ret = v4l2_fwnode_endpoint_alloc_parse(endpoint, &bus_cfg);
+	if (ret) {
+		dev_err(dev, "parsing endpoint node failed");
+		goto out_err;
+	}
+
+	/* Check the number of MIPI CSI2 data lanes */
+	if (bus_cfg.bus.mipi_csi2.num_data_lanes != 2  && bus_cfg.bus.mipi_csi2.num_data_lanes != 4 ) {
+		dev_err(dev, "only 2 / 4 data lanes are currently supported");
+		goto out_err;
+	}
+	isx031->lanes = bus_cfg.bus.mipi_csi2.num_data_lanes;
+
+	v4l2_fwnode_endpoint_free(&bus_cfg);
+	fwnode_handle_put(endpoint);
+	return 0;
+
+out_err:
+	v4l2_fwnode_endpoint_free(&bus_cfg);
+	fwnode_handle_put(endpoint);
+	return -EINVAL;
+}
+
+#if LINUX_VERSION_CODE < KERNEL_VERSION(6, 1, 0)
+static int isx031_remove(struct i2c_client *client)
+#else
 static void isx031_remove(struct i2c_client *client)
+#endif
 {
 	struct v4l2_subdev *sd = i2c_get_clientdata(client);
 	struct isx031 *isx031 = to_isx031(sd);
@@ -731,6 +774,11 @@ static int isx031_probe(struct i2c_client *client)
 		return -ENOMEM;
 
 	isx031->client = client;
+
+	ret = isx031_parse_fwnode(isx031, &client->dev);
+	if (ret)
+		dev_warn(&client->dev, "Parse fwnode failed\n");
+
 	isx031->platform_data = client->dev.platform_data;
 	if (isx031->platform_data == NULL)
 		dev_warn(&client->dev, "no platform data provided\n");
