@@ -1235,6 +1235,9 @@ int v4l2_subdev_get_fwnode_pad_1_to_1(struct media_entity *entity,
 	if (device_match_fwnode(sd->dev, fwnode))
 		return endpoint->port;
 
+	if (sd->fwnode->secondary == endpoint->local_fwnode || sd->fwnode->secondary == fwnode)
+		return endpoint->port;
+
 	return -ENXIO;
 }
 EXPORT_SYMBOL_GPL(v4l2_subdev_get_fwnode_pad_1_to_1);
