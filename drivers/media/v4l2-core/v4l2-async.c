@@ -460,8 +460,13 @@ again:
 static void v4l2_async_unbind_subdev_one(struct v4l2_async_notifier *notifier,
 					 struct v4l2_async_connection *asc)
 {
+	if (!asc)
+		return;
+
 	list_move_tail(&asc->asc_entry, &notifier->waiting_list);
 	if (list_is_singular(&asc->asc_subdev_entry)) {
+		if (!asc->sd)
+			return;
 		v4l2_async_nf_call_unbind(notifier, asc->sd, asc);
 		v4l2_device_unregister_subdev(asc->sd);
 		asc->sd = NULL;
