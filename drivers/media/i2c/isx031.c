@@ -813,6 +813,12 @@ probe_error_media_entity_cleanup:
 	return ret;
 }
 
+static const struct acpi_device_id isx031_acpi_ids[] = {
+        { "INTC1031" },
+        {}
+};
+MODULE_DEVICE_TABLE(acpi, isx031_acpi_ids);
+
 static const struct dev_pm_ops isx031_pm_ops = {
 	SET_SYSTEM_SLEEP_PM_OPS(isx031_suspend, isx031_resume)
 };
@@ -827,6 +833,7 @@ static struct i2c_driver isx031_i2c_driver = {
 	.driver = {
 		.name = "isx031",
 		.pm = &isx031_pm_ops,
+		.acpi_match_table = ACPI_PTR(isx031_acpi_ids),
 	},
 	.probe = isx031_probe,
 	.remove = isx031_remove,
