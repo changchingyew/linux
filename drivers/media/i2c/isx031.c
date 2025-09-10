@@ -836,7 +836,19 @@ static int isx031_probe(struct i2c_client *client)
 		goto probe_error_media_entity_cleanup;
 	}
 	isx031->cur_mode = isx031->pre_mode;
+
+	ret = v4l2_subdev_init_finalize(&isx031->sd);
+	if (ret < 0) {
+			dev_err(&client->dev, "failed to finalize V4L2 subdev: %d",
+					ret);
+			goto probe_error_media_entity_cleanup;
+	}
+
+#if LINUX_VERSION_CODE < KERNEL_VERSION(5, 13, 0)
+	ret = v4l2_async_register_subdev_sensor_common(&isx031->sd);
+#else
 	ret = v4l2_async_register_subdev_sensor(&isx031->sd);
+#endif
 	if (ret < 0) {
 		dev_err(&client->dev, "failed to register V4L2 subdev: %d",
 			ret);
