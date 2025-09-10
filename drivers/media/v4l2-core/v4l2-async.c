@@ -904,7 +904,7 @@ static void print_waiting_match(struct seq_file *s,
 {
 	switch (match->type) {
 	case V4L2_ASYNC_MATCH_TYPE_I2C:
-		seq_printf(s, " [i2c] dev=%d-%04x\n", match->i2c.adapter_id,
+		seq_printf(s, "\t\t[i2c] dev=%d-%04x\n", match->i2c.adapter_id,
 			   match->i2c.address);
 		break;
 	case V4L2_ASYNC_MATCH_TYPE_FWNODE: {
@@ -914,7 +914,7 @@ static void print_waiting_match(struct seq_file *s,
 			  fwnode_graph_get_port_parent(fwnode) :
 			  fwnode_handle_get(fwnode);
 
-		seq_printf(s, " [fwnode] dev=%s, node=%pfw\n",
+		seq_printf(s, "\t\t[fwnode] dev=%s, node=%pfw\n",
 			   devnode->dev ? dev_name(devnode->dev) : "nil",
 			   fwnode);
 
@@ -939,13 +939,23 @@ static int pending_subdevs_show(struct seq_file *s, void *data)
 {
 	struct v4l2_async_notifier *notif;
 	struct v4l2_async_connection *asc;
+	struct v4l2_subdev *sd;
 
 	mutex_lock(&list_lock);
 
+	seq_printf(s, "notifier list\n");
+
 	list_for_each_entry(notif, &notifier_list, notifier_entry) {
-		seq_printf(s, "%s:\n", v4l2_async_nf_name(notif));
+		seq_printf(s, "\t%s:\n", v4l2_async_nf_name(notif));
 		list_for_each_entry(asc, &notif->waiting_list, asc_entry)
 			print_waiting_match(s, &asc->match);
+	}
+
+	seq_printf(s, "async sub-device list\n");
+
+	list_for_each_entry(sd, &subdev_list, async_list) {
+		seq_printf(s, "\t[fwnode] dev=%s, entity=%s, node=%pfw\n",
+			dev_name(sd->dev), sd->entity.name, sd->fwnode);
 	}
 
 	mutex_unlock(&list_lock);
