@@ -1652,6 +1652,9 @@ int i2c_add_adapter(struct i2c_adapter *adapter)
 		}
 	}
 
+	if (adapter->is_atr && adapter->nr > 0)
+		return __i2c_add_numbered_adapter(adapter);
+
 	mutex_lock(&core_lock);
 	id = idr_alloc(&i2c_adapter_idr, adapter,
 		       __i2c_first_dynamic_bus_num, 0, GFP_KERNEL);
