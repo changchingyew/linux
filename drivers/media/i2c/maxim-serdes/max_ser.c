@@ -414,13 +414,22 @@ static void max_ser_i2c_mux_deinit(struct max_ser_priv *priv)
 
 static int max_ser_i2c_mux_init(struct max_ser_priv *priv)
 {
+	u32 adapter;
+
 	priv->mux = i2c_mux_alloc(priv->client->adapter, &priv->client->dev,
 				  1, 0, I2C_MUX_LOCKED | I2C_MUX_GATE,
 				  max_ser_i2c_mux_select, NULL);
 	if (!priv->mux)
 		return -ENOMEM;
 
-	return i2c_mux_add_adapter(priv->mux, 0, 0);
+	/* serializer only have 1 input */
+	if (fwnode_property_present(dev_fwnode(priv->dev), "mux-adapter"))
+		fwnode_property_read_u32(dev_fwnode(priv->dev), "mux-adapter", &adapter);
+
+	if (adapter < 0)
+		adapter = 0;
+
+	return i2c_mux_add_adapter(priv->mux, adapter, 0);
 }
 
 static int max_ser_i2c_adapter_init(struct max_ser_priv *priv)
