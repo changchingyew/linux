@@ -460,7 +460,6 @@ static void isx031_update_pad_format(const struct isx031_mode *mode,
 	fmt->width = mode->width;
 	fmt->height = mode->height;
 	fmt->code = mode->code;
-	fmt->field = V4L2_FIELD_NONE;
 }
 
 static int isx031_start_streaming(struct isx031 *isx031)
