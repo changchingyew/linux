@@ -434,7 +434,8 @@ static int max_ser_i2c_mux_init(struct max_ser_priv *priv)
 
 static int max_ser_i2c_adapter_init(struct max_ser_priv *priv)
 {
-	if (device_get_named_child_node(priv->dev, "i2c-gate"))
+	if (device_get_named_child_node(priv->dev, "i2c-gate") ||
+		fwnode_property_present(dev_fwnode(priv->dev), "i2c-gate"))
 		return max_ser_i2c_mux_init(priv);
 	else
 		return max_ser_i2c_atr_init(priv);
@@ -442,7 +443,8 @@ static int max_ser_i2c_adapter_init(struct max_ser_priv *priv)
 
 static void max_ser_i2c_adapter_deinit(struct max_ser_priv *priv)
 {
-	if (device_get_named_child_node(priv->dev, "i2c-gate"))
+	if (device_get_named_child_node(priv->dev, "i2c-gate") ||
+		fwnode_property_present(dev_fwnode(priv->dev), "i2c-gate"))
 		max_ser_i2c_mux_deinit(priv);
 	else
 		max_ser_i2c_atr_deinit(priv);
