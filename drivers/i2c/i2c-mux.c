@@ -317,10 +317,12 @@ int i2c_mux_add_adapter(struct i2c_mux_core *muxc,
 	priv->adap.owner = THIS_MODULE;
 	priv->adap.algo = &priv->algo;
 	priv->adap.algo_data = priv;
-	priv->adap.dev.parent = &parent->dev;
+	priv->adap.dev.parent = muxc->dev;
 	priv->adap.retries = parent->retries;
 	priv->adap.timeout = parent->timeout;
 	priv->adap.quirks = parent->quirks;
+	priv->adap.is_mux = true;
+	priv->adap.chan_id = chan_id;
 	if (muxc->mux_locked)
 		priv->adap.lock_ops = &i2c_mux_lock_ops;
 	else
@@ -369,13 +371,8 @@ int i2c_mux_add_adapter(struct i2c_mux_core *muxc,
 		of_node_put(mux_node);
 	}
 
-	/*
-	 * Associate the mux channel with an ACPI node.
-	 */
-	if (has_acpi_companion(muxc->dev))
-		acpi_preset_companion(&priv->adap.dev,
-				      ACPI_COMPANION(muxc->dev),
-				      chan_id);
+	if (dev_fwnode(muxc->dev))
+		device_set_node(&priv->adap.dev, dev_fwnode(muxc->dev));
 
 	if (force_nr) {
 		priv->adap.nr = force_nr;
