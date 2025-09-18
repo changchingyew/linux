@@ -53,6 +53,7 @@ s64 ipu7_isys_csi2_get_link_freq(struct ipu7_isys_csi2 *csi2)
 	struct media_pad *src_pad;
 	struct v4l2_subdev *ext_sd;
 	struct device *dev;
+	s64 ret;
 
 	if (!csi2)
 		return -EINVAL;
@@ -69,7 +70,16 @@ s64 ipu7_isys_csi2_get_link_freq(struct ipu7_isys_csi2 *csi2)
 	if (WARN(!ext_sd, "Failed to get subdev for %s\n", csi2->asd.sd.name))
 		return -ENODEV;
 
-	return v4l2_get_link_freq(ext_sd->ctrl_handler, 0, 0);
+	ret = v4l2_get_link_freq(ext_sd->ctrl_handler, 0, 0);
+	if (ret < 0) {
+		ret = v4l2_get_link_freq(src_pad, 0, 0);
+		if (ret < 0) {
+			dev_err(dev, "Failed to get link frequency for %s\n",
+				csi2->asd.sd.name);
+			return ret;
+		}
+	}
+	return ret;
 }
 
 static int csi2_subscribe_event(struct v4l2_subdev *sd, struct v4l2_fh *fh,
