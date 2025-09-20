@@ -300,13 +300,14 @@ static unsigned int max96724_phy_id(struct max_des *des, struct max_des_phy *phy
 {
 	unsigned int num_hw_data_lanes = max_des_phy_hw_data_lanes(des, phy);
 
+#if 0 // FIXME
 	/* PHY 1 is the master PHY when combining PHY 0 and PHY 1. */
 	if (phy->index == 0 && num_hw_data_lanes == 4)
 		return 1;
 
 	if (phy->index == 1 && !des->phys[1].enabled)
 		return 0;
-
+#endif
 	return phy->index;
 }
 
