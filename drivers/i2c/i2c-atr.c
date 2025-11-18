@@ -44,17 +44,6 @@ struct i2c_atr_alias_pair {
 };
 
 /**
- * struct i2c_atr_adapter_pool - Pool of child adapter to be created.
- * @size:	 Total number of adapters
- * @adapters: Array of adapter IDs
- */
-
-struct i2c_atr_adapter_pool {
-	size_t size;
-	u16 *adapters;
-};
-
-/**
  * struct i2c_atr_alias_pool - Pool of client aliases available for an ATR.
  * @size:     Total number of aliases
  * @shared:   Indicates if this alias pool is shared by multiple channels
@@ -137,36 +126,12 @@ struct i2c_atr {
 	u32 flags;
 
 	struct i2c_atr_alias_pool *alias_pool;
-	struct i2c_atr_adapter_pool *adapter_pool;
 
 	struct notifier_block i2c_nb;
 
 	struct i2c_adapter *adapter[] __counted_by(max_adapters);
 };
-static struct i2c_atr_adapter_pool *i2c_atr_alloc_adapter_pool(size_t num_adapters, bool shared)
-{
-	struct i2c_atr_adapter_pool *adapter_pool;
-	int ret;
 
-	adapter_pool = kzalloc(sizeof(*adapter_pool), GFP_KERNEL);
-	if (!adapter_pool)
-		return ERR_PTR(-ENOMEM);
-
-	adapter_pool->size = num_adapters;
-
-	adapter_pool->adapters = kcalloc(num_adapters, sizeof(*adapter_pool->adapters), GFP_KERNEL);
-	if (!adapter_pool->adapters) {
-		ret = -ENOMEM;
-		goto err_free_adapter_pool;
-	}
-
-	return adapter_pool;
-
-	kfree(adapter_pool->adapters);
-err_free_adapter_pool:
-	kfree(adapter_pool);
-	return ERR_PTR(ret);
-}
 static struct i2c_atr_alias_pool *i2c_atr_alloc_alias_pool(size_t num_aliases, bool shared)
 {
 	struct i2c_atr_alias_pool *alias_pool;
@@ -202,11 +167,7 @@ err_free_alias_pool:
 	kfree(alias_pool);
 	return ERR_PTR(ret);
 }
-static void i2c_atr_free_adapter_pool(struct i2c_atr_adapter_pool *adapter_pool)
-{
-	kfree(adapter_pool->adapters);
-	kfree(adapter_pool);
-}
+
 static void i2c_atr_free_alias_pool(struct i2c_atr_alias_pool *alias_pool)
 {
 	bitmap_free(alias_pool->use_mask);
@@ -677,78 +638,7 @@ static int i2c_atr_bus_notifier_call(struct notifier_block *nb,
 
 	return NOTIFY_DONE;
 }
-static int i2c_atr_parse_adapter_pool(struct i2c_atr *atr)
-{
-	struct i2c_atr_adapter_pool *adapter_pool;
-	struct device *dev = atr->dev;
-	size_t num_adapters;
-	unsigned int i;
-	u32 *adapters32;
-	int ret;
 
-	if (!fwnode_property_present(dev_fwnode(dev), "i2c-adapter-pool")) {
-		num_adapters = 0;
-		return 0;
-	} else {
-		ret = fwnode_property_count_u32(dev_fwnode(dev), "i2c-adapter-pool");
-		if (ret < 0) {
-			dev_err(dev, "Failed to count 'i2c-adapter-pool' property: %d\n",
-				ret);
-			return ret;
-		}
-
-		num_adapters = ret;
-	}
-
-	adapter_pool = i2c_atr_alloc_adapter_pool(num_adapters, true);
-	if (IS_ERR(adapter_pool)) {
-		ret = PTR_ERR(adapter_pool);
-		dev_err(dev, "Failed to allocate adapter pool, err %d\n", ret);
-		return ret;
-	}
-
-	atr->adapter_pool = adapter_pool;
-
-	if (!adapter_pool->size)
-		return 0;
-
-	adapters32 = kcalloc(num_adapters, sizeof(*adapters32), GFP_KERNEL);
-	if (!adapters32) {
-		ret = -ENOMEM;
-		goto err_free_adapter_pool;
-	}
-
-	ret = fwnode_property_read_u32_array(dev_fwnode(dev), "i2c-adapter-pool",
-					     adapters32, num_adapters);
-	if (ret < 0) {
-		dev_err(dev, "Failed to read 'i2c-adapter-pool' property: %d\n",
-			ret);
-		goto err_free_adapters32;
-	}
-
-	for (i = 0; i < num_adapters; i++) {
-		if (!(adapters32[i] & 0xffff0000)) {
-			adapter_pool->adapters[i] = adapters32[i];
-			continue;
-		}
-
-		dev_err(dev, "Failed to parse 'i2c-adapter-pool' property: I2C flags are not supported\n");
-		ret = -EINVAL;
-		goto err_free_adapters32;
-	}
-
-	kfree(adapters32);
-
-	dev_dbg(dev, "i2c-adapter-pool has %zu adapters\n", adapter_pool->size);
-
-	return 0;
-
-err_free_adapters32:
-	kfree(adapters32);
-err_free_adapter_pool:
-	i2c_atr_free_adapter_pool(adapter_pool);
-	return ret;
-}
 static int i2c_atr_parse_alias_pool(struct i2c_atr *atr)
 {
 	struct i2c_atr_alias_pool *alias_pool;
@@ -854,10 +744,6 @@ struct i2c_atr *i2c_atr_new(struct i2c_adapter *parent, struct device *dev,
 	atr->algo.functionality = i2c_atr_functionality;
 
 	ret = i2c_atr_parse_alias_pool(atr);
-	if (ret)
-		goto err_destroy_mutex;
-
-	ret = i2c_atr_parse_adapter_pool(atr);
 	if (ret)
 		goto err_destroy_mutex;
 
@@ -983,9 +869,6 @@ int i2c_atr_add_adapter(struct i2c_atr *atr, struct i2c_atr_adap_desc *desc)
 	}
 
 	atr->adapter[chan_id] = &chan->adap;
-
-	if (atr->adapter_pool)
-		atr->adapter[chan_id]->nr = atr->adapter_pool->adapters[chan_id];
 
 	ret = i2c_add_adapter(&chan->adap);
 	if (ret) {
